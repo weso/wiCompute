@@ -23,7 +23,7 @@ libraryDependencies ++= Seq("junit" % "junit" % "4.8.1" % "test" ,
 							"org.scalaj" %% "scalaj-collection" % "1.5"
 )
 
-// mainClass in assembly := Some("es.weso.wiExtract.Main.class")
+mainClass in assembly := Some("es.weso.computex.AddComputations")
 
 test in assembly := {}
 
