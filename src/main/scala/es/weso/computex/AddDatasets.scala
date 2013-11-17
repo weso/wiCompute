@@ -24,6 +24,7 @@ import com.hp.hpl.jena.rdf.model.Literal
 import com.hp.hpl.jena.rdf.model.Property
 import PREFIXES._
 import scala.collection.JavaConverters
+import CexUtils._
 
 class AddDatasetsOpts(arguments: Array[String],
     onError: (Throwable, Scallop) => Nothing
@@ -39,6 +40,9 @@ class AddDatasetsOpts(arguments: Array[String],
         			descr = "Turtle file")
     val output  = opt[String]("out",
     				descr = "Output file")
+    val year = opt[Int]("year", 
+    				required = true, 
+    				descr = "Year of index")
     val version = opt[Boolean]("version", 
     				noshort = true, 
     				descr = "Print version")
@@ -51,16 +55,8 @@ class AddDatasetsOpts(arguments: Array[String],
 
 object AddDatasets extends App {
 
- lazy val YearDataset = 2013
+ lazy val patternPrimaryDatasets = """Q\d{1,3}-Ordered""".r
  
- def hasComputation(m:Model, r:Resource, t:Resource) : Boolean = {
-   if (hasProperty(m,r,cex_computation)) {
-     val comp = findProperty_asResource(m,r,cex_computation)
-     val typeComp = findProperty_asResource(m,comp,rdf_type)
-     typeComp == t
-   } else
-      false
- }
   
  def imputedDatasets(m:Model) : Model = {
    val newModel = ModelFactory.createDefaultModel()
@@ -97,13 +93,31 @@ object AddDatasets extends App {
    newModel
  }
  
+ def isPrimaryIndicator(m: Model, indicator : Resource) = {
+   m.contains(indicator,rdf_type,wf_onto_PrimaryIndicator)
+ }
+ 
+ def isPrimaryDataset(m : Model, d: Resource) : Boolean = {
+   var isPrimary = false
+   if (hasProperty(m,d,qb_slice)) {
+     val iterSlices = m.listObjectsOfProperty(d,qb_slice)
+     while (iterSlices.hasNext) {
+       val slice = iterSlices.next.asResource
+       val indicator = findProperty_asResource(m,slice,cex_indicator)
+       if (isPrimaryIndicator(m, indicator)) isPrimary = true
+     }
+   } 
+   isPrimary
+ }
+ 
  def normalizedDatasets(m:Model) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    val datasetsIter = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
    
    while (datasetsIter.hasNext) {
      val dataset = datasetsIter.nextResource()
-     if (hasComputation(m,dataset,cex_Imputed) || hasComputation(m,dataset,cex_Raw)) {
+     if (hasComputationType(m,dataset,cex_Imputed) || isPrimaryDataset(m,dataset)) {
+
        val newDataSet = newModel.createResource()
        newModel.add(newDataSet,rdf_type,qb_DataSet)
        
@@ -165,7 +179,7 @@ object AddDatasets extends App {
    newModel
  }
 
- def clusterIndicatorsDataset(m:Model) : Model = {
+ def clusterIndicatorsDataset(m:Model, year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    val newDataSet = wi_dataset_ClusterIndicators
 
@@ -174,70 +188,44 @@ object AddDatasets extends App {
    val computation = newModel.createResource
    newModel.add(computation,rdf_type,cex_ClusterDataSets)
    newModel.add(newDataSet,cex_computation,computation)
+
    // Collect normalized datasets
    val iterDatasets = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
    while (iterDatasets.hasNext) {
      val dataset = iterDatasets.nextResource
-     if (hasComputation(m,dataset,cex_NormalizeDataSet)) {
+     if (hasComputationType(m,dataset,cex_NormalizeDataSet)) {
        newModel.add(computation,cex_dataSet,dataset)
      }
    }
-   val dim = wf_onto_ref_year
-   val valueDim = literalInt(YearDataset)
-   newModel.add(computation,cex_dimension,dim)
-   // TODO: Year should be a parameter
-   newModel.add(computation,cex_value,valueDim)
 
+   
    newModel.add(newDataSet,sdmxAttribute_unitMeasure,dbpedia_Year)
    newModel.add(newDataSet,qb_structure,wf_onto_DSD)
-   
-   // Todo: Create slices for each indicator
+
+   val dim = wf_onto_ref_year
+   val valueDim = literalInteger(year)
+   newModel.add(computation,cex_dimension,dim)
+   newModel.add(computation,cex_value,valueDim)
+
+   // Create one slice for each indicator
    val iterIndicators = m.listSubjectsWithProperty(rdf_type,cex_Indicator)
    while (iterIndicators.hasNext) {
      val indicator = iterIndicators.nextResource
      val sliceIndicator = newModel.createResource
      newModel.add(sliceIndicator,rdf_type,qb_Slice)
-     newModel.add(newDataSet,qb_slice,sliceIndicator)
      newModel.add(sliceIndicator,cex_indicator,indicator)
      newModel.add(sliceIndicator,dim,valueDim)
+     newModel.add(newDataSet,qb_slice,sliceIndicator)
    }
    
    newModel.setNsPrefixes(PREFIXES.cexMapping)
    newModel
  }
 
-/* def indicatorsWeightedDataset(m:Model) : Model = {
+  def clustersGroupedDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   val newDataSet = newModel.createResource(wi_dataset_IndicatorsWeighted.getURI)
-
-   newModel.add(newDataSet,rdf_type,qb_DataSet)
+   val newDataSet = wi_dataset_ClustersGrouped 
    
-   val computation = newModel.createResource
-   newModel.add(computation,rdf_type,cex_WeightedSimple)
-   newModel.add(computation,cex_dataSet,wi_dataset_ClusterIndicators)
-   newModel.add(computation,cex_weightSchema,wi_weightSchema_indicatorWeights)
-   newModel.add(newDataSet,cex_computation,computation)
-   newModel.add(newDataSet,sdmxAttribute_unitMeasure,dbpedia_Year)
-   newModel.add(newDataSet,qb_structure,wf_onto_DSD)
-   
-   val iterIndicators = m.listSubjectsWithProperty(rdf_type,cex_Indicator)
-   while (iterIndicators.hasNext) {
-     val indicator = iterIndicators.nextResource
-     val slice = newModel.createResource()
-     newModel.add(slice,rdf_type,qb_Slice)
-     newModel.add(slice,cex_indicator,indicator)
-     newModel.add(slice,wf_onto_ref_year,literalInt(YearDataset))
-     newModel.add(slice,qb_sliceStructure,wf_onto_sliceByArea)
-     newModel.add(newDataSet,qb_slice,slice)
-   }
-   newModel.setNsPrefixes(PREFIXES.cexMapping)
-   newModel
- } */
-
-  def clustersGroupedDataset(m:Model) : Model = {
-   val newModel = ModelFactory.createDefaultModel()
-   val newDataSet = wi_dataset_ClustersGrouped // newModel.createResource(wi_dataset_ClustersGrouped.getURI)
-
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
    val computation = newModel.createResource
@@ -260,7 +248,7 @@ object AddDatasets extends App {
      val slice = newModel.createResource()
      newModel.add(slice,rdf_type,qb_Slice)
      newModel.add(slice,cex_indicator,component)
-     newModel.add(slice,wf_onto_ref_year,literalInt(YearDataset))
+     newModel.add(slice,wf_onto_ref_year,literalInteger(year))
      newModel.add(slice,qb_sliceStructure,wf_onto_sliceByArea)
      newModel.add(newDataSet,qb_slice,slice)
    }
@@ -275,7 +263,7 @@ object AddDatasets extends App {
   def mkRanking(m: Model, s: String) : Resource  = m.createResource(wi_ranking + s)
   def mkRanking(m: Model, r: Resource): Resource = mkRanking(m,r.getLocalName)
 
-  def subindexGroupedDataset(m:Model) : Model = {
+  def subindexGroupedDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    val newDataSet = wi_dataset_SubIndexGrouped // newModel.createResource(wi_dataset_SubIndexGrouped.getURI)
 
@@ -300,7 +288,7 @@ object AddDatasets extends App {
      val slice = mkSlice(newModel,subindex)
      newModel.add(slice,rdf_type,qb_Slice)
      newModel.add(slice,cex_indicator,subindex)
-     newModel.add(slice,wf_onto_ref_year,literalInt(YearDataset))
+     newModel.add(slice,wf_onto_ref_year,literalInteger(year))
      newModel.add(slice,qb_sliceStructure,wf_onto_sliceByArea)
      newModel.add(newDataSet,qb_slice,slice)
    }
@@ -309,7 +297,7 @@ object AddDatasets extends App {
    newModel
  }
 
- def compositeDataset(m:Model) : Model = {
+ def compositeDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    val newDataSet = wi_dataset_Composite // newModel.createResource(wi_dataset_Composite.getURI)
 
@@ -331,7 +319,7 @@ object AddDatasets extends App {
    val slice = mkSlice(m,"Composite")
    newModel.add(slice,rdf_type,qb_Slice)
    newModel.add(slice,cex_indicator,index)
-   newModel.add(slice,wf_onto_ref_year,literalInt(YearDataset))
+   newModel.add(slice,wf_onto_ref_year,literalInteger(year))
    newModel.add(slice,qb_sliceStructure,wf_onto_sliceByArea)
    newModel.add(newDataSet,qb_slice,slice)
 
@@ -339,7 +327,7 @@ object AddDatasets extends App {
    newModel
  }
 
- def rankingsDataset(m:Model) : Model = {
+ def rankingsDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    val newDataSet = wi_dataset_Rankings // newModel.createResource(wi_dataset_Rankings.getURI)
 
@@ -361,7 +349,7 @@ object AddDatasets extends App {
      newModel.add(newDataSet,qb_slice,sliceToRank)
      newModel.add(sliceToRank,rdf_type,qb_slice)
      newModel.add(sliceToRank,cex_indicator,subindex)
-     newModel.add(sliceToRank,wf_onto_ref_year,literalInt(YearDataset))
+     newModel.add(sliceToRank,wf_onto_ref_year,literalInteger(year))
      newModel.add(sliceToRank,qb_sliceStructure,wf_onto_sliceByArea)
    }
    
@@ -370,22 +358,20 @@ object AddDatasets extends App {
    newModel.add(newDataSet,qb_slice,sliceRankComposite)
    newModel.add(sliceRankComposite,rdf_type,qb_slice)
    newModel.add(sliceRankComposite,cex_indicator,wi_index_index)
-   newModel.add(sliceRankComposite,wf_onto_ref_year,literalInt(YearDataset))
+   newModel.add(sliceRankComposite,wf_onto_ref_year,literalInteger(year))
    newModel.add(sliceRankComposite,qb_sliceStructure,wf_onto_sliceByArea)
 
    newModel.setNsPrefixes(PREFIXES.cexMapping)
    newModel
  }
 
- def addDatasets(m: Model) : Model = {
-//   m.add(imputedDatasets(m))
+ def addDatasets(m: Model, year: Int) : Model = {
    m.add(normalizedDatasets(m))
-   m.add(clusterIndicatorsDataset(m))
-//   m.add(indicatorsWeightedDataset(m))
-   m.add(clustersGroupedDataset(m))
-   m.add(subindexGroupedDataset(m))
-   m.add(compositeDataset(m))
-   m.add(rankingsDataset(m))
+   m.add(clusterIndicatorsDataset(m,year))
+   m.add(clustersGroupedDataset(m,year))
+   m.add(subindexGroupedDataset(m,year))
+   m.add(compositeDataset(m,year))
+   m.add(rankingsDataset(m,year))
  } 
 
  override def main(args: Array[String]) {
@@ -398,7 +384,7 @@ object AddDatasets extends App {
    val model = ModelFactory.createDefaultModel
    val inputStream = FileManager.get.open(opts.fileName())
    model.read(inputStream,"","TURTLE")
-   val newModel = addDatasets(model)
+   val newModel = addDatasets(model,opts.year())
    if (opts.output.get == None) newModel.write(System.out,"TURTLE")
    else {
      val fileOutput = opts.output()

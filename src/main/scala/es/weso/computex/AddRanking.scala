@@ -60,22 +60,18 @@ object AddRanking extends App {
    val compsRankingIter = m.listSubjectsWithProperty(rdf_type,cex_RankingDataset)
    while (compsRankingIter.hasNext) {
      val comp = compsRankingIter.nextResource()
-     println("Ranking computation " + comp)
      val datasetToCopy = findSubject_asResource(m,comp,cex_computation)
-     println("Dataset to copy: " + datasetToCopy)
 
      val iterSlicesToCopy = m.listObjectsOfProperty(datasetToCopy,qb_slice)
      while (iterSlicesToCopy.hasNext) {
        val sliceToCopy = iterSlicesToCopy.nextNode().asResource
        val indicatorToCopy = findProperty(m,sliceToCopy,cex_indicator)
-       println("Slice to copy: " + sliceToCopy)
 
        val iterSlicesToRank = m.listObjectsOfProperty(comp,cex_slice)
        while (iterSlicesToRank.hasNext) {
          val sliceToRank = iterSlicesToRank.nextNode().asResource
          val indicatorToRank = findProperty(m,sliceToRank,cex_indicator)
          if (indicatorToCopy == indicatorToRank) {
-        	 println("Slice to rank: " + sliceToRank + " with indicator " + indicatorToCopy.asResource.getLocalName)
         	 
          // Collect all observations to rank
          val iter1 = m.listObjectsOfProperty(sliceToRank, qb_observation)
@@ -98,7 +94,6 @@ object AddRanking extends App {
               val valueYear = findProperty(m,obsToRank,wf_onto_ref_year)
               val valueToRank = findProperty(m,obsToRank,cex_value)
               val ranking = sorted.indexWhere(p => p._1 == obsToRank) + 1 
-              println("Ranking of " + obsToRank + " with value " + valueToRank + "= " + ranking) 
       
         	  // Construct observation 
         	  val obs = m.createResource()

@@ -360,8 +360,10 @@ object JenaUtils {
      val node = iter.next.getObject
      if (!iter.hasNext) node 
      else {
-       logger.error("findProperty: Resource " + r + " has more than one value for property " + p)
-       node
+       val msg="findProperty: Resource " + r + " has more than one value for property " + p
+       throw new Exception(msg)
+//       logger.error(msg)
+//       node
      }
    }
    else
@@ -396,6 +398,9 @@ object JenaUtils {
 
   def literalInt(i : Int) 		= 
     ResourceFactory.createTypedLiteral(new Integer(i))
+
+  def literalInteger(i : Integer) 		= 
+    ResourceFactory.createTypedLiteral(i.toString,XSDDatatype.XSDinteger)
   def literalFloat(n : Float) 	= 
     ResourceFactory.createTypedLiteral(n.toString,XSDDatatype.XSDfloat)
   def literalDouble(n : Double) 	= 

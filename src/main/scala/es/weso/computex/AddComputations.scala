@@ -25,6 +25,7 @@ import com.hp.hpl.jena.rdf.model.Property
 import PREFIXES._
 import scala.collection.JavaConverters
 import es.weso.utils.StatsUtils._
+import CexUtils._
 
 class AddComputations(arguments: Array[String],
     onError: (Throwable, Scallop) => Nothing
@@ -40,6 +41,9 @@ class AddComputations(arguments: Array[String],
         			descr = "Turtle file")
     val output  = opt[String]("out",
     				descr = "Output file")
+    val year = opt[Int]("year", 
+                    required=true,
+    				descr = "Year of index")
     val version = opt[Boolean]("version", 
     				noshort = true, 
     				descr = "Print version")
@@ -52,100 +56,73 @@ class AddComputations(arguments: Array[String],
 
 
 object AddComputations extends App {
-  
- def hasComputationType(m:Model, r: Resource, t: Resource) : Boolean = {
-   if (hasProperty(m,r,cex_computation)) {
-    val c = findProperty_asResource(m,r,cex_computation)
-    val cType = findProperty_asResource(m,c,rdf_type)
-    cType.asResource == t
-   } else false
-   
- }
-
- def getValue(m:Model,obs:Resource) : Double = {
-   if (hasProperty(m,obs,cex_value)) {
-     findProperty(m,obs,cex_value).asLiteral.getDouble
-   } else {
-     // logger.error("Observation " + obs + " has no value. Assumed 0")
-     0.0
-   }
- }
-
-  def findDatasetWithComputation(m:Model, compType : Resource) : 
-	  		Option[(Resource,Resource)] = {
-   val iterDatasets = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
-   while (iterDatasets.hasNext) {
-     val dataset = iterDatasets.next
-     if (hasComputationType(m,dataset,compType)) {
-       return Some(dataset,findProperty_asResource(m,dataset,cex_computation))       
-     }
-   }
-   None
- }
 
  def addNormalize(m:Model) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   val iterDatasets = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
-   while (iterDatasets.hasNext) {
-     val datasetNormalized = iterDatasets.nextResource()
-     if (hasComputationType(m,datasetNormalized,cex_NormalizeDataSet)) {
-
-       logger.info("Normalize Dataset: " + datasetNormalized)
-       val computation = findProperty_asResource(m, datasetNormalized, cex_computation) 
-       val dataset = findProperty_asResource(m,computation,cex_dataSet)
+   val iterDataSets = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
+   while (iterDataSets.hasNext) {
+     val datasetTo = iterDataSets.nextResource()
+     if (hasComputationType(m,datasetTo,cex_NormalizeDataSet)) {
+       val computation = getComputation(m,datasetTo)
+       val datasetFrom = findProperty_asResource(m,computation,cex_dataSet)
 
        // Iterate for all slices to copy
-       val iterSlices = m.listObjectsOfProperty(datasetNormalized,qb_slice)
+       val iterSlices = m.listObjectsOfProperty(datasetTo,qb_slice)
        while (iterSlices.hasNext) {
-         val sliceToCopy = iterSlices.nextNode.asResource
-         val year = findProperty(m,sliceToCopy,wf_onto_ref_year)
-         val iterSlices2 = m.listObjectsOfProperty(dataset,qb_slice)
+         val sliceTo = iterSlices.nextNode.asResource
+         val yearTo = findProperty(m,sliceTo,wf_onto_ref_year)
+         
+         val iterSlices2 = m.listObjectsOfProperty(datasetFrom,qb_slice)
          while (iterSlices2.hasNext) {
-           val slice = iterSlices2.nextNode.asResource
-           val yearSlice = findProperty(m,slice,wf_onto_ref_year)
-           if (yearSlice == year) {
-             val indicator = findProperty_asResource(m,slice,cex_indicator)
+           val sliceFrom = iterSlices2.nextNode.asResource
+           val yearFrom = findProperty(m,sliceFrom,wf_onto_ref_year)
+           if (yearTo == yearFrom) {
+             val indicator = findProperty_asResource(m,sliceFrom,cex_indicator)
              val highLow = findProperty_asResource(m,indicator,cex_highLow)
              val isHigh = highLow == cex_High
              
              // Calculate Mean and SD
-             val iterObsMean = m.listObjectsOfProperty(slice,qb_observation)
+             val iterObsMean = m.listObjectsOfProperty(sliceFrom,qb_observation)
              val builder = Seq.newBuilder[Double]
              while (iterObsMean.hasNext) {
                val obs = iterObsMean.nextNode.asResource
-               val value = getValue(m,obs)
-               builder += value
+               val v = getValue(m,obs)
+               if (v.isDefined) builder += v.get
              }
              val seqObs = builder.result
              val (mean,sd) = calculateMeanSD(seqObs)
              
-             val iterObs = m.listObjectsOfProperty(slice,qb_observation)
+             val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
              while (iterObs.hasNext) {
-               val obs = iterObs.nextNode.asResource
-               val value = getValue(m,obs)
-               val area = findProperty(m,obs,wf_onto_ref_area)
-               val diff = if (isHigh) value - mean else mean - value 
-               val zScore = diff / sd
+               val obsFrom = iterObs.nextNode.asResource
+               val obsTo = newModel.createResource
+               newModel.add(sliceTo,qb_observation,obsTo)
+               newModel.add(obsTo,rdf_type,qb_Observation)
+               copyProperties(obsTo,newModel,
+                   Seq(wf_onto_ref_area, wf_onto_ref_year, cex_indicator),obsFrom,m)
+
+               getValue(m,obsFrom) match {
+                 case None => {}
+                 case Some(value) => {
+                    val area = findProperty(m,obsFrom,wf_onto_ref_area)
+                    val diff = if (isHigh) value - mean else mean - value 
+                    val zScore = diff / sd
+                    newModel.add(obsTo,cex_value,literalDouble(zScore))
+                 }
+               }
                
-               val newObs = newModel.createResource
-               newModel.add(sliceToCopy,qb_observation,newObs)
-               newModel.add(newObs,rdf_type,qb_Observation)
-               newModel.add(newObs,cex_value,literalDouble(zScore))
-               newModel.add(newObs,cex_indicator,indicator)
-               newModel.add(newObs,qb_dataSet,datasetNormalized)
-               newModel.add(newObs,wf_onto_ref_area,area)
-               newModel.add(newObs,wf_onto_ref_year,year)
-               newModel.add(newObs,sdmxConcept_obsStatus,cex_Normalized)
+               newModel.add(obsTo,qb_dataSet,datasetTo)
+               newModel.add(obsTo,sdmxConcept_obsStatus,cex_Normalized)
                val newComp = newModel.createResource
-               newModel.add(newObs,cex_computation,newComp)
+               newModel.add(obsTo,cex_computation,newComp)
                newModel.add(newComp,rdf_type,cex_Normalize)
-               newModel.add(newComp,cex_observation,obs)
-               newModel.add(newComp,cex_slice,slice)
+               newModel.add(newComp,cex_observation,obsFrom)
+               newModel.add(newComp,cex_slice,sliceFrom)
              }
            }
          }
        }
-    }
+     }
    }
    newModel
  }
@@ -158,66 +135,51 @@ object AddComputations extends App {
        logger.warn("No dataset with computation " + cex_ClusterDataSets)
      }
      case Some((datasetTo,computation)) => {
-      val iterDataSets = m.listObjectsOfProperty(computation,cex_dataSet)
-      while (iterDataSets.hasNext) {
-        val datasetFrom = iterDataSets.nextNode().asResource
-      val dim = findProperty_asProperty(m,computation,cex_dimension)
-      val valueDim = findProperty(m,computation,cex_value)
-      val iterSlices = m.listObjectsOfProperty(datasetTo,qb_slice)
-      while (iterSlices.hasNext) {
-        val sliceTo = iterSlices.nextNode().asResource
-        val valueDimSlice = findProperty(m,sliceTo,dim)
-        if (valueDimSlice == valueDim) {
+        val dim = findProperty_asProperty(m,computation,cex_dimension)
+        val valueDim = findProperty(m,computation,cex_value)
+        
+        val iterSlices1 = m.listObjectsOfProperty(datasetTo,qb_slice)
+        while (iterSlices1.hasNext) {
+         val sliceTo = iterSlices1.nextNode().asResource
          val indicatorTo = findProperty_asResource(m,sliceTo,cex_indicator)
+        }
+          
+        val iterSlices = m.listObjectsOfProperty(datasetTo,qb_slice)
+        while (iterSlices.hasNext) {
+         val sliceTo = iterSlices.nextNode().asResource
+         val indicatorTo = findProperty_asResource(m,sliceTo,cex_indicator)
+
+        val iterDataSets = m.listObjectsOfProperty(computation,cex_dataSet)
+        while (iterDataSets.hasNext) {
+         val datasetFrom = iterDataSets.nextNode().asResource
+
          val iterSlicesFrom = m.listObjectsOfProperty(datasetFrom,qb_slice)
          while (iterSlicesFrom.hasNext) {
-           val sliceFrom = iterSlicesFrom.nextNode.asResource
-           val indicatorFrom = findProperty_asResource(m,sliceFrom,cex_indicator)
-           if (indicatorTo == indicatorFrom) {
-             val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
-             while (iterObs.hasNext) {
-               val obsFrom = iterObs.nextNode().asResource()
-               val obsTo = newModel.createResource()
-               newModel.add(sliceTo,qb_observation,obsTo)
-               copyProperties(obsTo,newModel,Seq(wf_onto_ref_area, cex_value,wf_onto_ref_year),obsFrom,m)
-             } 
-           }
-         }
-        }
+            val sliceFrom = iterSlicesFrom.nextNode.asResource
+            val valueDimFrom = findProperty(m,sliceTo,dim)
+        
+            if (valueDimFrom == valueDim) {
+             val indicatorFrom = findProperty_asResource(m,sliceFrom,cex_indicator)
+             if (indicatorTo == indicatorFrom) {
+               val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
+               while (iterObs.hasNext) {
+                 val obsFrom = iterObs.nextNode().asResource()
+                 if (findProperty(m,obsFrom,dim) == valueDim) {
+                  val obsTo = newModel.createResource()
+                  newModel.add(sliceTo,qb_observation,obsTo)
+                  copyProperties(obsTo,newModel,Seq(wf_onto_ref_area, cex_value, dim),obsFrom,m)
+                 }
+               } 
+             }
+           } else println("...doesn't match valueDim")
+         } 
+       }
       }
-     }
      }
    }
    newModel
  }
 
- def findProperty_asProperty(m:Model, r:Resource, p:Property): Property = {
-   val vr = findProperty_asResource(m,r,p)
-   if (vr.isURIResource()) {
-     m.getProperty(vr.getURI)
-   } else
-     throw new Exception("findProperty_asProperty: value of property " + p + 
-                         " for resource " + r + " is " + vr + ", but should be an URI")
- }
- def copyProperties(to:Resource, modelTo: Model, ps:Seq[Property],from:Resource,modelFrom:Model): Unit = {
-   ps.foreach(p => copyProperty(to,modelTo,p,from,modelFrom))
- }
-
- def copyProperty(to: Resource, modelTo: Model,p: Property, from: Resource, modelFrom: Model): Unit = {
-   if (hasProperty(modelFrom,from,p)) {
-     val value = findProperty(modelFrom,from,p)
-     modelTo.add(to,p,value)
-   }
- }
- 
- def getObsValue(m: Model, obs: Resource) : Double = {
-   val value = findProperty(m,obs,cex_value)
-   value.asLiteral.getDouble()
- }
- 
- def getObsArea(m: Model, obs: Resource) : Resource = {
-   findProperty_asResource(m,obs,wf_onto_ref_area)
- }
 
  def groupClusters(m:Model) : Model = {
    val newModel = ModelFactory.createDefaultModel()
@@ -246,8 +208,6 @@ object AddComputations extends App {
         }
        } 
         
-       table.showInfo
-       
        // Fill groupings
        val iterComponents = m.listSubjectsWithProperty(rdf_type,cex_Component)
        val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
@@ -270,7 +230,7 @@ object AddComputations extends App {
        while (iterWeights.hasNext) {
           val weightNode = iterWeights.nextNode().asResource()
           val element = findProperty_asResource(m,weightNode,cex_element)
-          val weight  = getValue(m,weightNode)
+          val weight  = getValue(m,weightNode).get
           weightsBuilder += ((element,weight))
        }
        
@@ -313,10 +273,8 @@ object AddComputations extends App {
        newModel
      } 
      case Some((dataset,computation)) => {
-       println("Dataset to group: " + dataset)
        val datasetFrom = findProperty_asResource(m, computation, cex_dataSet)
 
-       println("Dataset From: " + datasetFrom)
        val dimension	  = findProperty_asResource(m, computation, cex_dimension)
        
        val table = TableComputations.empty
@@ -329,15 +287,12 @@ object AddComputations extends App {
         val iterObs = m.listObjectsOfProperty(slice,qb_observation)
         while (iterObs.hasNext) {
           val obs = iterObs.next.asResource()
-          println("Obs: " + obs)
           val value = getObsValue(m,obs)
           val area = getObsArea(m,obs)
           table.insert(indicator,area,value)
         }
        } 
         
-       table.showInfo
-
        // Fill groupings
        val iterSubindexes = m.listSubjectsWithProperty(rdf_type,cex_SubIndex)
        val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
@@ -360,7 +315,7 @@ object AddComputations extends App {
         while (iterWeights.hasNext) {
           val weightNode = iterWeights.nextNode().asResource()
           val element = findProperty_asResource(m,weightNode,cex_element)
-          val weight  = getValue(m,weightNode)
+          val weight  = getValue(m,weightNode).get
           weightsBuilder += ((element,weight))
         }
         val weights = weightsBuilder.result
@@ -403,10 +358,8 @@ object AddComputations extends App {
        newModel
      }
      case Some((dataset,computation)) => {
-       println("Dataset to group: " + dataset)
        val datasetFrom = findProperty_asResource(m, computation, cex_dataSet)
 
-       println("Dataset From: " + datasetFrom)
        val dimension	  = findProperty_asResource(m, computation, cex_dimension)
        
        val table = TableComputations.empty
@@ -425,8 +378,6 @@ object AddComputations extends App {
         }
        } 
         
-       table.showInfo
-
        // Fill groupings
        val index = m.getResource(wi_index_index.getURI)
        val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
@@ -446,7 +397,7 @@ object AddComputations extends App {
        while (iterWeights.hasNext) {
           val weightNode = iterWeights.nextNode().asResource()
           val element = findProperty_asResource(m,weightNode,cex_element)
-          val weight  = getValue(m,weightNode)
+          val weight  = getValue(m,weightNode).get
           weightsBuilder += ((element,weight))
         }
        val weights = weightsBuilder.result
@@ -481,8 +432,8 @@ object AddComputations extends App {
    }
  }
 
- def addComputations(m: Model) : Model = {
-   AddDatasets.addDatasets(m)
+ def addComputations(m: Model,year:Int) : Model = {
+   AddDatasets.addDatasets(m,year)
    val normalize = addNormalize(m)
    println("Normalized: " + normalize.size)
    m.add(normalize)  
@@ -499,11 +450,12 @@ object AddComputations extends App {
    println("Subindexes: " + subindexes.size)
    m.add(subindexes) 
 
-   val index = groupIndex(m)
+   val index = groupIndex(m)	
    println("Index: " + index.size)
    m.add(index) 
 
-   AddRanking.addRankings(m)
+   AddRanking.addRankings(m) 
+   
    m
  } 
 
@@ -518,7 +470,7 @@ object AddComputations extends App {
    val model = ModelFactory.createDefaultModel
    val inputStream = FileManager.get.open(opts.fileName())
    model.read(inputStream,"","TURTLE")
-   val newModel = addComputations(model)
+   val newModel = addComputations(model, opts.year())
    if (opts.output.get == None) newModel.write(System.out,"TURTLE")
    else {
      val fileOutput = opts.output()
