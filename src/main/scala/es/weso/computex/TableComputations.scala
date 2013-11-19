@@ -26,6 +26,7 @@ import scala.collection.JavaConverters
 import es.weso.utils.StatsUtils._
 import scala.collection.immutable.HashMap
 
+
 case class TableComputations() {
     
 val table = scala.collection.mutable.HashMap[(Resource,Resource),Option[(Double,Seq[(Resource,Double,Double)])]]()
@@ -63,7 +64,8 @@ def getAreas: Set[Resource] = {
 }
 
 def group(groupings: Map[Resource,Set[Resource]],
-		  weights:Map[Resource,Double]
+		  weights:Map[Resource,Double],
+		  doMean : Boolean
          ): TableComputations = {
   try {
    val areas = getAreas
@@ -72,7 +74,7 @@ def group(groupings: Map[Resource,Set[Resource]],
    for (c <- groupings.keys ; a <- areas) {
      val ps = (for (i <- groupings(c) ; if (lookup(i,a) != None)) 
     	 	   yield (i, lookupValue(i,a), weights(i)) ).toSeq
-     weightedAvg(ps) match {
+     weightedAvg(ps,doMean) match {
        case None => result.insert(c,a,None)
        case Some(v) => result.insert(c,a,Some((v,ps)))
      }
@@ -87,12 +89,16 @@ def group(groupings: Map[Resource,Set[Resource]],
  }
   
 
-def weightedAvg(vs : Seq[(Resource,Double,Double)]) : Option[Double] = {
+def weightedAvg(vs : Seq[(Resource,Double,Double)], doMean : Boolean ) : Option[Double] = {
    if (vs.isEmpty) None
    else {
-     val countNonCero = vs.filter(t => t._3 != 0.0).length
      val sum = vs.foldLeft(0.0)((r,p)=> p._2 * p._3 + r)
-     Some(sum / countNonCero.toDouble)
+     if (doMean) {
+       val countNonCero = vs.filter(t => t._3 != 0.0).length
+       Some(sum / countNonCero.toDouble)
+     }
+     else 
+       Some(sum)
    }
  }
 
@@ -121,5 +127,7 @@ def weightedAvg(vs : Seq[(Resource,Double,Double)]) : Option[Double] = {
 }
 
 object TableComputations {
+  
+  
   def newTable : TableComputations = new TableComputations()
 }

@@ -108,7 +108,7 @@ object AddComputations extends App {
                     val diff = if (isHigh) value - mean else mean - value 
                     val zScore = diff / sd
                     val finalZScore : Double = 
-                      if (Math.abs(zScore) < 0.0001) 0.0
+                      if (Math.abs(zScore) < 0.001) 0.0
                       else zScore
                     newModel.add(obsTo,cex_value,literalDouble(finalZScore))
                  }
@@ -189,20 +189,20 @@ object AddComputations extends App {
  
  
  def groupClusters(m:Model) : Model = {
-   groupMean(m,cex_GroupClusters,wi_weightSchema_indicatorWeights,cex_Component)
+   groupMean(m,cex_GroupClusters,wi_weightSchema_indicatorWeights,cex_Component,true)
  }
 
 
  def groupSubIndex(m:Model) : Model = {
-   groupMean(m,cex_GroupSubIndex,wi_weightSchema_componentWeights,cex_SubIndex)
+   groupMean(m,cex_GroupSubIndex,wi_weightSchema_componentWeights,cex_SubIndex,false)
  }
 
  
  def groupIndex(m:Model) : Model = {
-   groupMean(m,cex_GroupIndex,wi_weightSchema_subindexWeights,cex_Index)
+   groupMean(m,cex_GroupIndex,wi_weightSchema_subindexWeights,cex_Index,false)
  }
 
- def groupMean(m:Model, compType: Resource, weightSchema: Resource, level: Resource) : Model = {
+ def groupMean(m:Model, compType: Resource, weightSchema: Resource, level: Resource, doMean: Boolean) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    findDatasetWithComputation(m,compType) match {
      case None =>{
@@ -216,7 +216,7 @@ object AddComputations extends App {
        val table = collectObservations(m, datasetFrom)
        val groupings = collectGroupings(m, level)
        val weights = collectWeights(m, weightSchema)
-       val newTable = table.group(groupings,weights)
+       val newTable = table.group(groupings,weights,doMean)
        saveTable(newModel,m,dataset,newTable,weightSchema)
        newModel
      }
