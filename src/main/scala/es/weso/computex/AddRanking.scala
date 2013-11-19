@@ -84,7 +84,7 @@ object AddRanking extends App {
      
          // Sort observations to rank
          val sorted = scala.util.Sorting.stableSort(builder.result,
-          (p1: (Resource,Double),p2 : (Resource,Double)) => p1._2 < p2._2)
+          (p1: (Resource,Double),p2 : (Resource,Double)) => p1._2 >= p2._2)
 
           // Loop to create rankings
           val iter2 = m.listObjectsOfProperty(sliceToRank, qb_observation)

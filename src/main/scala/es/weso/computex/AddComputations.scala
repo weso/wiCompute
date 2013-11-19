@@ -107,7 +107,10 @@ object AddComputations extends App {
                     val area = findProperty(m,obsFrom,wf_onto_ref_area)
                     val diff = if (isHigh) value - mean else mean - value 
                     val zScore = diff / sd
-                    newModel.add(obsTo,cex_value,literalDouble(zScore))
+                    val finalZScore : Double = 
+                      if (Math.abs(zScore) < 0.0001) 0.0
+                      else zScore
+                    newModel.add(obsTo,cex_value,literalDouble(finalZScore))
                  }
                }
                
@@ -117,6 +120,8 @@ object AddComputations extends App {
                newModel.add(obsTo,cex_computation,newC)
                newModel.add(newC,rdf_type,cex_Normalize)
                newModel.add(newC,cex_observation,obsFrom)
+               newModel.add(newC,cex_mean,literalDouble(mean))
+               newModel.add(newC,cex_stdDesv,literalDouble(sd))
                newModel.add(newC,cex_slice,sliceFrom)
              }
            }

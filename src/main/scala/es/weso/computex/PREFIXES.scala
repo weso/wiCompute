@@ -191,6 +191,8 @@ object PREFIXES {
  lazy val cex_computation 			= property("cex","computation")
  lazy val cex_component				= property("cex","component")
  lazy val cex_dataSet				= property("cex","dataSet")
+ lazy val cex_mean					= property("cex","mean")
+ lazy val cex_stdDesv				= property("cex","stdDesv")
  lazy val cex_dimension				= property("cex","dimension")
  lazy val cex_group					= property("cex","group")
  lazy val cex_element				= property("cex","element")

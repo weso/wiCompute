@@ -90,8 +90,9 @@ def group(groupings: Map[Resource,Set[Resource]],
 def weightedAvg(vs : Seq[(Resource,Double,Double)]) : Option[Double] = {
    if (vs.isEmpty) None
    else {
+     val countNonCero = vs.filter(t => t._3 != 0.0).length
      val sum = vs.foldLeft(0.0)((r,p)=> p._2 * p._3 + r)
-     Some(sum / vs.length)
+     Some(sum / countNonCero.toDouble)
    }
  }
 
