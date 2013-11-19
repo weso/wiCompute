@@ -261,7 +261,7 @@ weightSchema:indicatorWeights a cex:WeightSchema ;
 				  ] ;
   .				  
 
-weightSchema:clusterWeights a cex:WeightSchema ;
+weightSchema:componentWeights a cex:WeightSchema ;
        cex:weight [ a cex:Weight ;
 	                cex:element component:AB ;
                     cex:value 1  					

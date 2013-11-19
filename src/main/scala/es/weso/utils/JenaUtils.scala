@@ -42,6 +42,7 @@ final case class NotParsed[B](error: B)
 
 object JenaUtils {
   
+  var bNodeCount    = 0
   val logger 		= LoggerFactory.getLogger("Application")
 
   lazy val RdfXML 		= "RDF/XML"
@@ -410,5 +411,9 @@ object JenaUtils {
     ResourceFactory.createPlainLiteral(name)
     
 
+  def newResourceNoBlankNode(m: Model, base: String) : Resource = {
+    bNodeCount = bNodeCount + 1
+    m.createResource(base + bNodeCount)
+  }
 
 }

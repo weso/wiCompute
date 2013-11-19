@@ -13,6 +13,7 @@ object PREFIXES {
   lazy val webindex 	= "http://data.webfoundation.org/webindex/v2013/"
   lazy val odb		 	= "http://data.webfoundation.org/odb/v2013/"
   lazy val test		 	= "http://data.webfoundation.org/test/v2013/"
+  lazy val webindex_bnode 	= webindex + "bnode/"
   lazy val wi_computation	= webindex + "computation/"
   lazy val wi_component		= webindex + "component/"
   lazy val wi_dataset		= webindex + "dataset/"
@@ -24,6 +25,10 @@ object PREFIXES {
   lazy val wi_ranking		= webindex + "ranking/"
   lazy val wi_slice			= webindex + "slice/"
   lazy val wi_weightSchema	= webindex + "weightSchema/"
+  lazy val wi_datasetComputed = wi_dataset + "computed"
+  lazy val wi_compComputed = wi_computation + "computed"
+  lazy val wi_obsComputed	  = wi_obs + "computed"
+  lazy val wi_sliceComputed	  = wi_slice + "computed"
   lazy val odb_computation	= odb + "computation/"
   lazy val odb_component	= odb + "component/"
   lazy val odb_dataset		= odb + "dataset/"
@@ -148,6 +153,7 @@ object PREFIXES {
  // Structural elements
  lazy val cex_Component			= resource("cex","Component")
  lazy val cex_SubIndex			= resource("cex","SubIndex")
+ lazy val cex_Index				= resource("cex","Index")
  
  lazy val cex_AdjustDataSet		= resource("cex","AdjustDataSet")
  lazy val cex_AvgGrowth2Missing = resource("cex","AvgGrowth2Missing")
@@ -186,6 +192,7 @@ object PREFIXES {
  lazy val cex_component				= property("cex","component")
  lazy val cex_dataSet				= property("cex","dataSet")
  lazy val cex_dimension				= property("cex","dimension")
+ lazy val cex_group					= property("cex","group")
  lazy val cex_element				= property("cex","element")
  lazy val cex_highLow				= property("cex","highLow")
  lazy val cex_increment				= property("cex","increment")
@@ -197,6 +204,7 @@ object PREFIXES {
  lazy val cex_slice					= property("cex","slice")
  lazy val cex_value					= property("cex","value")
  lazy val cex_weight				= property("cex","weight")
+ lazy val cex_weightMap				= property("cex","weightMap")
  lazy val cex_weightSchema			= property("cex","weightSchema")   
  
  lazy val dbpedia_Year 				= resource("dbpedia","Year")

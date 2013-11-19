@@ -24,18 +24,20 @@ import com.hp.hpl.jena.rdf.model.Property
 import PREFIXES._
 import scala.collection.JavaConverters
 import es.weso.utils.StatsUtils._
+import scala.collection.immutable.HashMap
 
-case class TableComputations(table: scala.collection.mutable.HashMap[(Resource,Resource),Option[Double]]) {
+case class TableComputations() {
+    
+val table = scala.collection.mutable.HashMap[(Resource,Resource),Option[(Double,Seq[(Resource,Double,Double)])]]()
+val areas = scala.collection.mutable.Set[Resource]() 
 
-  val areas = scala.collection.mutable.Set[Resource]() 
-
-  def insert(i: Resource, a: Resource, v: Double) : Unit = {
-   insert(i,a,Some(v))
+def insert(i: Resource, a: Resource, v: Double, vs: Seq[(Resource,Double,Double)]) : Unit = {
+   insert(i,a,Some(v,vs))
   }
 
-def insert(i: Resource, a: Resource, v: Option[Double]) : Unit = {
-  areas += a
-  table.put((i,a),v)
+def insert(i: Resource, a: Resource, v: Option[(Double,Seq[(Resource,Double,Double)])]) : Unit = {
+  table.put((i,a), v)
+  areas+= a 
 }
 
 def contains(i: Resource, a: Resource) : Boolean = {
@@ -43,9 +45,17 @@ def contains(i: Resource, a: Resource) : Boolean = {
   else false
 }
 
-def lookup(i : Resource, a: Resource) : Option[Double] = {
+def lookup(i : Resource, a: Resource) : Option[(Double,Seq[(Resource,Double,Double)])] = {
   if (table.contains((i,a))) table((i,a))
   else None
+}
+
+def lookupValue(i : Resource, a: Resource) : Double = {
+  table((i,a)).get._1
+}
+
+def lookupList(i : Resource, a: Resource) : Seq[(Resource,Double,Double)]= {
+  table((i,a)).get._2
 }
 
 def getAreas: Set[Resource] = {
@@ -55,20 +65,32 @@ def getAreas: Set[Resource] = {
 def group(groupings: Map[Resource,Set[Resource]],
 		  weights:Map[Resource,Double]
          ): TableComputations = {
+  try {
    val areas = getAreas
-   val result = TableComputations.empty
+   val result = TableComputations.newTable
+
    for (c <- groupings.keys ; a <- areas) {
-     val vs = (for (i <- groupings(c); if lookup(i,a) != None) 
-               yield (lookup(i,a).get,weights(i))).toSeq
-     result.insert(c,a,weightedAvg(vs))
+     val ps = (for (i <- groupings(c) ; if (lookup(i,a) != None)) 
+    	 	   yield (i, lookupValue(i,a), weights(i)) ).toSeq
+     weightedAvg(ps) match {
+       case None => result.insert(c,a,None)
+       case Some(v) => result.insert(c,a,Some((v,ps)))
+     }
    }
    result
-}
+  } catch {
+    case e: Exception => {
+      println("Exception grouping: " + e)
+      TableComputations.newTable
+    }
+   }
+ }
+  
 
-def weightedAvg(vs : Seq[(Double,Double)]) : Option[Double] = {
+def weightedAvg(vs : Seq[(Resource,Double,Double)]) : Option[Double] = {
    if (vs.isEmpty) None
    else {
-     val sum = vs.foldLeft(0.0)((r,p)=> p._1 * p._2 + r)
+     val sum = vs.foldLeft(0.0)((r,p)=> p._2 * p._3 + r)
      Some(sum / vs.length)
    }
  }
@@ -92,9 +114,11 @@ def weightedAvg(vs : Seq[(Double,Double)]) : Option[Double] = {
    println("Areas: " + getAreas)
    println("Indicators: " + getIndicators)
  }
+
+ def empty : Unit = table.clear
+
 }
 
 object TableComputations {
-  val empty = TableComputations(scala.collection.mutable.HashMap[(Resource,Resource),Option[Double]]())
-
+  def newTable : TableComputations = new TableComputations()
 }

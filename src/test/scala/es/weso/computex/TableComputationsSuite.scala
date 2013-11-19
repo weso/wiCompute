@@ -27,25 +27,26 @@ class TableComputationsSuite extends FunSpec
 
       val weights : Map[Resource,Double] = Map(A -> 1, B -> 0.5, C -> 0.6, D -> 0.8, E -> 1)
 
-      val table = TableComputations.empty
-      table.insert(A,ESP,2)
-      table.insert(A,USA,4)
+      val table = TableComputations.newTable
+      def value(x : Double) : Option[(Double,Seq[(Resource,Double,Double)])] = Some(x,Seq())
+      table.insert(A,ESP,value(2))
+      table.insert(A,USA,value(4))
       
-      table.insert(B,ESP,3)
-      table.insert(B,FRA,4)
-      table.insert(B,USA,5)
+      table.insert(B,ESP,value(3))
+      table.insert(B,FRA,value(4))
+      table.insert(B,USA,value(5))
 
-      table.insert(C,ESP,4)
-      table.insert(C,FRA,1)
-      table.insert(C,USA,2)
+      table.insert(C,ESP,value(4))
+      table.insert(C,FRA,value(1))
+      table.insert(C,USA,value(2))
 
-      table.insert(D,ESP,5)
-      table.insert(D,FRA,2)
-      table.insert(D,USA,7)
+      table.insert(D,ESP,value(5))
+      table.insert(D,FRA,value(2))
+      table.insert(D,USA,value(7))
 
-      table.insert(E,ESP,6)
-      table.insert(E,FRA,3)
-      table.insert(E,USA,8)
+      table.insert(E,ESP,value(6))
+      table.insert(E,FRA,value(3))
+      table.insert(E,USA,value(8))
 
       val C1 = ResourceFactory.createResource("C1")
  	  val C2 = ResourceFactory.createResource("C2")
@@ -55,9 +56,10 @@ class TableComputationsSuite extends FunSpec
  	  val groupings = Map(C1 -> Set(A,B), C2 -> Set(C,D), C3 -> Set(E))
  	  val newTable = table.group(groupings,weights)
  	  
- 	  newTable.lookup(C1,USA) should be(Some(3.25))
- 	  newTable.lookup(C3,FRA) should be(Some(3))
- 	  newTable.lookup(C1,FRA) should be(Some(2))
+ 	  newTable.lookupValue(C1,USA) should be(3.25)
+ 	  newTable.lookupList(C1,USA).toList should be (List((A,4,1),(B,5,0.5)))
+ 	  newTable.lookupValue(C3,FRA) should be(3)
+ 	  newTable.lookupValue(C1,FRA) should be(2)
  	  newTable.lookup(C4,FRA) should be(None)
  	  newTable.lookup(C1,SEA) should be(None)
 

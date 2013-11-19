@@ -95,7 +95,7 @@ object AddComputations extends App {
              val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
              while (iterObs.hasNext) {
                val obsFrom = iterObs.nextNode.asResource
-               val obsTo = newModel.createResource
+               val obsTo = newObs(m)
                newModel.add(sliceTo,qb_observation,obsTo)
                newModel.add(obsTo,rdf_type,qb_Observation)
                copyProperties(obsTo,newModel,
@@ -113,11 +113,11 @@ object AddComputations extends App {
                
                newModel.add(obsTo,qb_dataSet,datasetTo)
                newModel.add(obsTo,sdmxConcept_obsStatus,cex_Normalized)
-               val newComp = newModel.createResource
-               newModel.add(obsTo,cex_computation,newComp)
-               newModel.add(newComp,rdf_type,cex_Normalize)
-               newModel.add(newComp,cex_observation,obsFrom)
-               newModel.add(newComp,cex_slice,sliceFrom)
+               val newC = newComp(m)
+               newModel.add(obsTo,cex_computation,newC)
+               newModel.add(newC,rdf_type,cex_Normalize)
+               newModel.add(newC,cex_observation,obsFrom)
+               newModel.add(newC,cex_slice,sliceFrom)
              }
            }
          }
@@ -137,12 +137,7 @@ object AddComputations extends App {
      case Some((datasetTo,computation)) => {
         val dim = findProperty_asProperty(m,computation,cex_dimension)
         val valueDim = findProperty(m,computation,cex_value)
-        
-        val iterSlices1 = m.listObjectsOfProperty(datasetTo,qb_slice)
-        while (iterSlices1.hasNext) {
-         val sliceTo = iterSlices1.nextNode().asResource
-         val indicatorTo = findProperty_asResource(m,sliceTo,cex_indicator)
-        }
+        val yearDim = valueDim.asLiteral.getInt
           
         val iterSlices = m.listObjectsOfProperty(datasetTo,qb_slice)
         while (iterSlices.hasNext) {
@@ -164,10 +159,11 @@ object AddComputations extends App {
                val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
                while (iterObs.hasNext) {
                  val obsFrom = iterObs.nextNode().asResource()
-                 if (findProperty(m,obsFrom,dim) == valueDim) {
-                  val obsTo = newModel.createResource()
+                 if (mustBeClustered(m,obsFrom,yearDim)) { 
+                  val obsTo = newObs(m)
                   newModel.add(sliceTo,qb_observation,obsTo)
-                  copyProperties(obsTo,newModel,Seq(wf_onto_ref_area, cex_value, dim),obsFrom,m)
+                  copyProperties(obsTo,newModel,Seq(wf_onto_ref_area, cex_value),obsFrom,m)
+                  newModel.add(obsTo,wf_onto_ref_year,valueDim)
                  }
                } 
              }
@@ -181,257 +177,137 @@ object AddComputations extends App {
  }
 
 
- def groupClusters(m:Model) : Model = {
-   val newModel = ModelFactory.createDefaultModel()
-   findDatasetWithComputation(m,cex_GroupClusters) match {
-     case None => {
-       logger.warn("No dataset with computation " + cex_GroupClusters)
-       newModel
-     }
-     case Some((dataset,computation)) => {
-       val datasetFrom = findProperty_asResource(m, computation, cex_dataSet)
-       val dimension	  = findProperty_asResource(m, computation, cex_dimension)
-       
-       val table = TableComputations.empty
-       
-       // Collect observations into a table
-       val iterSlices = m.listObjectsOfProperty(datasetFrom,qb_slice)
-       while (iterSlices.hasNext) {
-        val slice = iterSlices.next.asResource
-        val indicator = findProperty_asResource(m,slice,cex_indicator)
-        val iterObs = m.listObjectsOfProperty(slice,qb_observation)
-        while (iterObs.hasNext) {
-          val obs = iterObs.next.asResource()
-          val value = getObsValue(m,obs)
-          val area = getObsArea(m,obs)
-          table.insert(indicator,area,value)
-        }
-       } 
-        
-       // Fill groupings
-       val iterComponents = m.listSubjectsWithProperty(rdf_type,cex_Component)
-       val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
-       while (iterComponents.hasNext) {
-          val component = iterComponents.nextResource()
-            val iterElements = m.listObjectsOfProperty(component,cex_element)
-            val elemsBuilder = Set.newBuilder[Resource]
-        	while(iterElements.hasNext) {
-              val element = iterElements.next.asResource
-              elemsBuilder += element
-            }
-           groupingsBuilder+= ((component,elemsBuilder.result))
-       }
-       val groupings = groupingsBuilder.result
-        
-       // Fill weights
-       val indicatorWeights = m.getResource(wi_weightSchema_indicatorWeights.getURI)
-       val weightsBuilder = Map.newBuilder[Resource,Double]
-       val iterWeights = m.listObjectsOfProperty(indicatorWeights,cex_weight)
-       while (iterWeights.hasNext) {
-          val weightNode = iterWeights.nextNode().asResource()
-          val element = findProperty_asResource(m,weightNode,cex_element)
-          val weight  = getValue(m,weightNode).get
-          weightsBuilder += ((element,weight))
-       }
-       
-       val weights = weightsBuilder.result
-        
-       val newTable = table.group(groupings,weights)
-
-       val iterSlicesTo = m.listObjectsOfProperty(dataset,qb_slice)
-       while (iterSlicesTo.hasNext) {
-         val sliceTo = iterSlicesTo.next.asResource
-         val indicator = findProperty_asResource(m,sliceTo,cex_indicator)
-         val year = findProperty(m,sliceTo,wf_onto_ref_year)
-         for (area <- table.getAreas) {
-           if (table.contains(indicator,area)) {
-        	 val obs = newModel.createResource
-             newModel.add(obs,rdf_type,qb_Observation)
-             newModel.add(obs,cex_indicator,indicator)
-             newModel.add(obs,wf_onto_ref_area,area)
-             newModel.add(obs,wf_onto_ref_year,year)
-             newModel.add(obs,cex_value,literalDouble(table.lookup(indicator,area).get))
-             newModel.add(sliceTo,qb_observation,obs)
-             val comp = newModel.createResource()
-             newModel.add(obs,cex_computation,comp)
-             newModel.add(comp,rdf_type,cex_GroupMean)
-             newModel.add(comp,cex_weightSchema,indicatorWeights)
-           }
-         }
-       }
-        
-       newModel
-     }
-   }
+ def mustBeClustered(m: Model, obs: Resource, year: Int) : Boolean = {
+   if (isPrimaryObs(m,obs)) getObsYear(m,obs) == year
+   else getObsYear(m,obs) == (year - 1)
  }
  
+ 
+ def groupClusters(m:Model) : Model = {
+   groupMean(m,cex_GroupClusters,wi_weightSchema_indicatorWeights,cex_Component)
+ }
+
+
  def groupSubIndex(m:Model) : Model = {
+   groupMean(m,cex_GroupSubIndex,wi_weightSchema_componentWeights,cex_SubIndex)
+ }
+
+ 
+ def groupIndex(m:Model) : Model = {
+   groupMean(m,cex_GroupIndex,wi_weightSchema_subindexWeights,cex_Index)
+ }
+
+ def groupMean(m:Model, compType: Resource, weightSchema: Resource, level: Resource) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   findDatasetWithComputation(m,cex_GroupSubIndex) match {
+   findDatasetWithComputation(m,compType) match {
      case None =>{
-       logger.warn("No dataset with computation " + cex_GroupSubIndex)
+       logger.warn("No dataset with computation " + compType)
        newModel
      } 
      case Some((dataset,computation)) => {
        val datasetFrom = findProperty_asResource(m, computation, cex_dataSet)
+       val dimension   = findProperty_asResource(m, computation, cex_dimension)
 
-       val dimension	  = findProperty_asResource(m, computation, cex_dimension)
-       
-       val table = TableComputations.empty
-       
-       // Collect observations into a table
-       val iterSlices = m.listObjectsOfProperty(datasetFrom,qb_slice)
-       while (iterSlices.hasNext) {
-        val slice = iterSlices.next.asResource
-        val indicator = findProperty_asResource(m,slice,cex_indicator)
-        val iterObs = m.listObjectsOfProperty(slice,qb_observation)
-        while (iterObs.hasNext) {
-          val obs = iterObs.next.asResource()
-          val value = getObsValue(m,obs)
-          val area = getObsArea(m,obs)
-          table.insert(indicator,area,value)
-        }
-       } 
-        
-       // Fill groupings
-       val iterSubindexes = m.listSubjectsWithProperty(rdf_type,cex_SubIndex)
-       val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
-       while (iterSubindexes.hasNext) {
-         val component = iterSubindexes.nextResource()
-         val iterElements = m.listObjectsOfProperty(component,cex_element)
-         val elemsBuilder = Set.newBuilder[Resource]
-         while(iterElements.hasNext) {
-            val element = iterElements.next.asResource
-              elemsBuilder += element
-         }
-         groupingsBuilder+= ((component,elemsBuilder.result))
-       }
-       val groupings = groupingsBuilder.result
-        
-        // Fill weights
-        val componentWeights = m.getResource(wi_weightSchema_componentWeights.getURI)
-        val weightsBuilder = Map.newBuilder[Resource,Double]
-        val iterWeights = m.listObjectsOfProperty(componentWeights,cex_weight)
-        while (iterWeights.hasNext) {
-          val weightNode = iterWeights.nextNode().asResource()
-          val element = findProperty_asResource(m,weightNode,cex_element)
-          val weight  = getValue(m,weightNode).get
-          weightsBuilder += ((element,weight))
-        }
-        val weights = weightsBuilder.result
-        
-        val newTable = table.group(groupings,weights)
-
-        val iterSlicesTo = m.listObjectsOfProperty(dataset,qb_slice)
-        while (iterSlicesTo.hasNext) {
-         val sliceTo = iterSlicesTo.next.asResource
-         val indicator = findProperty_asResource(m,sliceTo,cex_indicator)
-         val year = findProperty(m,sliceTo,wf_onto_ref_year)
-         for (area <- table.getAreas) {
-           if (table.contains(indicator,area)) {
-        	 val obs = newModel.createResource
-             newModel.add(obs,rdf_type,qb_Observation)
-             newModel.add(obs,cex_indicator,indicator)
-             newModel.add(obs,wf_onto_ref_area,area)
-             newModel.add(obs,wf_onto_ref_year,year)
-             newModel.add(obs,cex_value,literalDouble(table.lookup(indicator,area).get))
-             newModel.add(sliceTo,qb_observation,obs)
-             val comp = newModel.createResource()
-             newModel.add(obs,cex_computation,comp)
-             newModel.add(comp,rdf_type,cex_GroupMean)
-             newModel.add(comp,cex_weightSchema,componentWeights)
-           }
-         }
-        }
-        
-        newModel
-
-     }
-   }
- }
-
- def groupIndex(m:Model) : Model = {
-   val newModel = ModelFactory.createDefaultModel()
-   findDatasetWithComputation(m,cex_GroupIndex) match {
-     case None => {
-       logger.warn("No dataset with computation " + cex_GroupIndex)
+       val table = collectObservations(m, datasetFrom)
+       val groupings = collectGroupings(m, level)
+       val weights = collectWeights(m, weightSchema)
+       val newTable = table.group(groupings,weights)
+       saveTable(newModel,m,dataset,newTable,weightSchema)
        newModel
      }
-     case Some((dataset,computation)) => {
-       val datasetFrom = findProperty_asResource(m, computation, cex_dataSet)
+   }
+ }
 
-       val dimension	  = findProperty_asResource(m, computation, cex_dimension)
-       
-       val table = TableComputations.empty
-       
-       // Collect observations into a table
-       val iterSlices = m.listObjectsOfProperty(datasetFrom,qb_slice)
-       while (iterSlices.hasNext) {
-        val slice = iterSlices.next.asResource
-        val indicator = findProperty_asResource(m,slice,cex_indicator)
-        val iterObs = m.listObjectsOfProperty(slice,qb_observation)
-        while (iterObs.hasNext) {
-          val obs = iterObs.next.asResource()
-          val value = getObsValue(m,obs)
-          val area = getObsArea(m,obs)
-          table.insert(indicator,area,value)
-        }
-       } 
-        
-       // Fill groupings
-       val index = m.getResource(wi_index_index.getURI)
-       val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
-       val iterElements = m.listObjectsOfProperty(index,cex_element)
-       val elemsBuilder = Set.newBuilder[Resource]
-       while(iterElements.hasNext) {
-         val element = iterElements.next.asResource
-         elemsBuilder += element
-       }
-       groupingsBuilder+= ((index,elemsBuilder.result))
-       val groupings = groupingsBuilder.result
-        
-       // Fill weights
-       val subindexWeights = m.getResource(wi_weightSchema_subindexWeights.getURI)
-       val weightsBuilder = Map.newBuilder[Resource,Double]
-       val iterWeights = m.listObjectsOfProperty(subindexWeights,cex_weight)
-       while (iterWeights.hasNext) {
-          val weightNode = iterWeights.nextNode().asResource()
-          val element = findProperty_asResource(m,weightNode,cex_element)
-          val weight  = getValue(m,weightNode).get
-          weightsBuilder += ((element,weight))
-        }
-       val weights = weightsBuilder.result
-        
-       val newTable = table.group(groupings,weights)
-
-       val iterSlicesTo = m.listObjectsOfProperty(dataset,qb_slice)
-       while (iterSlicesTo.hasNext) {
+ def saveTable(newModel : Model,oldModel : Model, dataset: Resource, table: TableComputations, weights: Resource) : Unit = {
+   val iterSlicesTo = oldModel.listObjectsOfProperty(dataset,qb_slice)
+   while (iterSlicesTo.hasNext) {
          val sliceTo = iterSlicesTo.next.asResource
-         val indicator = findProperty_asResource(m,sliceTo,cex_indicator)
-         val year = findProperty(m,sliceTo,wf_onto_ref_year)
+         val indicator = findProperty_asResource(oldModel,sliceTo,cex_indicator)
+         val year = findProperty(oldModel,sliceTo,wf_onto_ref_year)
          for (area <- table.getAreas) {
            if (table.contains(indicator,area)) {
-        	 val obs = newModel.createResource
+        	 val obs = newObs(newModel)
              newModel.add(obs,rdf_type,qb_Observation)
              newModel.add(obs,cex_indicator,indicator)
              newModel.add(obs,wf_onto_ref_area,area)
              newModel.add(obs,wf_onto_ref_year,year)
-             newModel.add(obs,cex_value,literalDouble(table.lookup(indicator,area).get))
+             addValueComputed(newModel,obs,indicator,area,table,weights)
              newModel.add(sliceTo,qb_observation,obs)
-             val comp = newModel.createResource()
-             newModel.add(obs,cex_computation,comp)
-             newModel.add(comp,rdf_type,cex_GroupMean)
-             newModel.add(comp,cex_weightSchema,subindexWeights)
            }
          }
         }
-        
-        newModel
-
-     }
-   }
  }
 
+ def collectWeights(m:Model, w: Resource) = {
+   val weightsBuilder = Map.newBuilder[Resource,Double]
+   val iterWeights = m.listObjectsOfProperty(w,cex_weight)
+   while (iterWeights.hasNext) {
+      val weightNode = iterWeights.nextNode().asResource()
+      val element = findProperty_asResource(m,weightNode,cex_element)
+      val weight  = getValue(m,weightNode).get
+      weightsBuilder += ((element,weight))
+    }
+    weightsBuilder.result
+ }
+
+ def collectGroupings(m:Model, typeComponent: Resource) = {
+   val iterComponents = m.listSubjectsWithProperty(rdf_type,typeComponent)
+   val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
+   while (iterComponents.hasNext) {
+     val component = iterComponents.nextResource()
+     val iterElements = m.listObjectsOfProperty(component,cex_element)
+     val elemsBuilder = Set.newBuilder[Resource]
+     while(iterElements.hasNext) {
+        val element = iterElements.next.asResource
+        elemsBuilder += element
+      }
+     groupingsBuilder+= ((component,elemsBuilder.result))
+    }
+   groupingsBuilder.result
+ }
+
+ 
+ def collectObservations(m: Model, dataset: Resource) : TableComputations = {
+   val table = TableComputations.newTable
+   val iterSlices = m.listObjectsOfProperty(dataset,qb_slice)
+   while (iterSlices.hasNext) {
+    val slice = iterSlices.next.asResource
+    val indicator = findProperty_asResource(m,slice,cex_indicator)
+    val iterObs = m.listObjectsOfProperty(slice,qb_observation)
+    while (iterObs.hasNext) {
+       val obs = iterObs.next.asResource()
+       val area = getObsArea(m,obs) 
+       getObsValue(m,obs) match {
+         case None => {}
+         case Some(value) => {
+           table.insert(indicator,area,Some(value,Seq()))
+         }
+       }
+      }
+   }
+   table
+ }
+ 
+
+ def addValueComputed(m: Model, obs: Resource, indicator: Resource, area: Resource, table: TableComputations, weights: Resource) : Unit = {
+   m.add(obs,cex_value,literalDouble(table.lookupValue(indicator,area)))
+   val comp = newComp(m)
+   m.add(obs,cex_computation,comp)
+   m.add(comp,rdf_type,cex_GroupMean)
+   m.add(comp,cex_weightSchema,weights)
+
+   val group = newResource(m)
+   m.add(comp,cex_group,group)
+   table.lookupList(indicator,area).foreach {
+    p => { val tuple = newResourceNoBlankNode(m, webindex_bnode)
+       	   m.add(group,cex_weightMap,tuple)
+           m.add(tuple,cex_element,p._1)
+           m.add(tuple,cex_value,literalDouble(p._2))
+           m.add(tuple,cex_weight,literalDouble(p._3))
+    }
+   }
+ }
+ 
  def addComputations(m: Model,year:Int) : Model = {
    AddDatasets.addDatasets(m,year)
    val normalize = addNormalize(m)

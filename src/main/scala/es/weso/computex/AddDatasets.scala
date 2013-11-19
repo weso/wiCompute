@@ -64,10 +64,10 @@ object AddDatasets extends App {
    
    while (iter.hasNext) {
      val dataset = iter.nextResource()
-     val newDataSet = newModel.createResource()
+     val newDataSet = newDataset(m)
      newModel.add(newDataSet,rdf_type,qb_DataSet)
      
-     val computation = newModel.createResource
+     val computation = newComp(m)
      newModel.add(computation,rdf_type,cex_ImputeDataSet)
      newModel.add(computation,cex_method,cex_AvgGrowth2Missing)
      newModel.add(computation,cex_method,cex_MeanBetweenMissing)
@@ -81,12 +81,12 @@ object AddDatasets extends App {
      val iterSlices = m.listStatements(dataset,qb_slice,null : RDFNode)
      while (iterSlices.hasNext) {
        val slice = iterSlices.next.getObject().asResource()
-       val newSlice = newModel.createResource()
-       newModel.add(newSlice,rdf_type,qb_Slice)
-       newModel.add(newSlice,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
-       newModel.add(newSlice,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
-       newModel.add(newSlice,qb_sliceStructure,wf_onto_sliceByArea)
-       newModel.add(newDataSet,qb_slice,newSlice)
+       val newS = newSlice(m)
+       newModel.add(newS,rdf_type,qb_Slice)
+       newModel.add(newS,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
+       newModel.add(newS,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
+       newModel.add(newS,qb_sliceStructure,wf_onto_sliceByArea)
+       newModel.add(newDataSet,qb_slice,newS)
      }
    }
    newModel.setNsPrefixes(PREFIXES.cexMapping)
@@ -118,10 +118,10 @@ object AddDatasets extends App {
      val dataset = datasetsIter.nextResource()
      if (hasComputationType(m,dataset,cex_Imputed) || isPrimaryDataset(m,dataset)) {
 
-       val newDataSet = newModel.createResource()
+       val newDataSet = newDataset(m)
        newModel.add(newDataSet,rdf_type,qb_DataSet)
        
-       val computation = newModel.createResource
+       val computation = newComp(m)
        newModel.add(computation,rdf_type,cex_NormalizeDataSet)
        newModel.add(computation,cex_dataSet,dataset)
        newModel.add(newDataSet,cex_computation,computation)
@@ -131,12 +131,12 @@ object AddDatasets extends App {
        val iterSlices = m.listStatements(dataset,qb_slice,null : RDFNode)
        while (iterSlices.hasNext) {
          val slice = iterSlices.next.getObject().asResource()
-         val newSlice = newModel.createResource()
-         newModel.add(newSlice,rdf_type,qb_Slice)
-         newModel.add(newSlice,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
-         newModel.add(newSlice,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
-         newModel.add(newSlice,qb_sliceStructure,wf_onto_sliceByArea)
-         newModel.add(newDataSet,qb_slice,newSlice)
+         val newS = newSlice(m)
+         newModel.add(newS,rdf_type,qb_Slice)
+         newModel.add(newS,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
+         newModel.add(newS,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
+         newModel.add(newS,qb_sliceStructure,wf_onto_sliceByArea)
+         newModel.add(newDataSet,qb_slice,newS)
        }
      }
    }
@@ -153,10 +153,10 @@ object AddDatasets extends App {
      val computation = findProperty_asResource(m,dataset,cex_computation)
      val typeComputation = findProperty(m,computation,rdf_type)
      if (typeComputation == cex_NormalizeDataSet) {
-       val newDataSet = newModel.createResource()
+       val newDataSet = newDataset(m)
        newModel.add(newDataSet,rdf_type,qb_DataSet)
        
-       val computation = newModel.createResource
+       val computation = newComp(m)
        newModel.add(computation,rdf_type,cex_AdjustDataSet)
        newModel.add(computation,cex_dataSet,dataset)
        newModel.add(newDataSet,cex_computation,computation)
@@ -166,12 +166,12 @@ object AddDatasets extends App {
        val iterSlices = m.listStatements(dataset,qb_slice,null : RDFNode)
        while (iterSlices.hasNext) {
          val slice = iterSlices.next.getObject().asResource()
-         val newSlice = newModel.createResource()
-         newModel.add(newSlice,rdf_type,qb_Slice)
-         newModel.add(newSlice,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
-         newModel.add(newSlice,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
-         newModel.add(newSlice,qb_sliceStructure,wf_onto_sliceByArea)
-         newModel.add(newDataSet,qb_slice,newSlice)
+         val newS = newSlice(m)
+         newModel.add(newS,rdf_type,qb_Slice)
+         newModel.add(newS,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
+         newModel.add(newS,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
+         newModel.add(newS,qb_sliceStructure,wf_onto_sliceByArea)
+         newModel.add(newDataSet,qb_slice,newS)
        }
      }
    }
@@ -185,7 +185,7 @@ object AddDatasets extends App {
 
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
-   val computation = newModel.createResource
+   val computation = newComp(m)
    newModel.add(computation,rdf_type,cex_ClusterDataSets)
    newModel.add(newDataSet,cex_computation,computation)
 
@@ -211,7 +211,7 @@ object AddDatasets extends App {
    val iterIndicators = m.listSubjectsWithProperty(rdf_type,cex_Indicator)
    while (iterIndicators.hasNext) {
      val indicator = iterIndicators.nextResource
-     val sliceIndicator = newModel.createResource
+     val sliceIndicator = newSlice(m)
      newModel.add(sliceIndicator,rdf_type,qb_Slice)
      newModel.add(sliceIndicator,cex_indicator,indicator)
      newModel.add(sliceIndicator,dim,valueDim)
@@ -228,7 +228,7 @@ object AddDatasets extends App {
    
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
-   val computation = newModel.createResource
+   val computation = newComp(m)
    newModel.add(computation,rdf_type,cex_GroupClusters)
    newModel.add(computation,cex_dataSet,wi_dataset_ClusterIndicators)
    newModel.add(computation,cex_dimension,wf_onto_ref_area)
@@ -245,7 +245,7 @@ object AddDatasets extends App {
      val component = iterComponents.nextResource()
      newModel.add(computation,cex_component,component)
      
-     val slice = newModel.createResource()
+     val slice = newSlice(m)
      newModel.add(slice,rdf_type,qb_Slice)
      newModel.add(slice,cex_indicator,component)
      newModel.add(slice,wf_onto_ref_year,literalInteger(year))
@@ -257,19 +257,14 @@ object AddDatasets extends App {
    newModel
  }
 
-  def mkSlice(m: Model, s: String) : Resource = m.createResource(wi_slice + s)
-  def mkSlice(m:Model, r: Resource) : Resource = mkSlice(m,r.getLocalName)
-  
-  def mkRanking(m: Model, s: String) : Resource  = m.createResource(wi_ranking + s)
-  def mkRanking(m: Model, r: Resource): Resource = mkRanking(m,r.getLocalName)
 
   def subindexGroupedDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   val newDataSet = wi_dataset_SubIndexGrouped // newModel.createResource(wi_dataset_SubIndexGrouped.getURI)
-
+   val newDataSet = wi_dataset_SubIndexGrouped 
+   
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
-   val computation = newModel.createResource
+   val computation = newComp(m)
    newModel.add(computation,rdf_type,cex_GroupSubIndex)
    newModel.add(computation,cex_dataSet,wi_dataset_ClustersGrouped)
    newModel.add(computation,cex_dimension,wf_onto_ref_area)
@@ -299,11 +294,11 @@ object AddDatasets extends App {
 
  def compositeDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   val newDataSet = wi_dataset_Composite // newModel.createResource(wi_dataset_Composite.getURI)
-
+   val newDataSet = wi_dataset_Composite 
+   
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
-   val computation = newModel.createResource
+   val computation = newComp(m)
    newModel.add(computation,rdf_type,cex_GroupIndex)
    newModel.add(computation,cex_dataSet,wi_dataset_SubIndexGrouped)
    newModel.add(computation,cex_dimension,wf_onto_ref_area)
@@ -329,11 +324,11 @@ object AddDatasets extends App {
 
  def rankingsDataset(m:Model,year:Int) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   val newDataSet = wi_dataset_Rankings // newModel.createResource(wi_dataset_Rankings.getURI)
-
+   val newDataSet = wi_dataset_Rankings 
+   
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
-   val computation = newModel.createResource
+   val computation = newComp(m)
    newModel.add(computation,rdf_type,cex_RankingDataset)
    newModel.add(computation,cex_dimension,wf_onto_ref_area)
    newModel.add(newDataSet,cex_computation,computation)

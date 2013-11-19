@@ -64,4 +64,5 @@ class WebIndexComponentsSuite extends FunSpec
   }
   
   ValidateComponentValues("ARG")
+  ValidateComponentValues("ESP")
 }

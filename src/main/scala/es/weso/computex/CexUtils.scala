@@ -27,7 +27,7 @@ import scala.collection.JavaConversions._
 import es.weso.utils.StatsUtils._
 
 object CexUtils {
-  
+ 
  def hasComputationType(m:Model, r: Resource, t: Resource) : Boolean = {
    if (hasProperty(m,r,cex_computation)) {
     val c = findProperty_asResource(m,r,cex_computation)
@@ -189,17 +189,33 @@ object CexUtils {
    }
  }
  
- def getObsValue(m: Model, obs: Resource) : Double = {
-   val value = findProperty(m,obs,cex_value)
-   value.asLiteral.getDouble()
+ def getObsValue(m: Model, obs: Resource) : Option[Double] = {
+   if (hasProperty(m,obs,cex_value)) {
+     val value = findProperty(m,obs,cex_value)
+     Some(value.asLiteral.getDouble())
+   } else 
+     None
  }
  
  def getObsArea(m: Model, obs: Resource) : Resource = {
    findProperty_asResource(m,obs,wf_onto_ref_area)
  }
 
+ def getObsYear(m: Model, obs: Resource) : Int = {
+   findProperty(m,obs,wf_onto_ref_year).asLiteral.getInt
+ }
+
+ def getObsIndicator(m: Model, obs: Resource) : Resource = {
+   if (hasProperty(m,obs,cex_indicator)) 
+     findProperty_asResource(m,obs,cex_indicator)
+   else 
+     throw 
+      new Exception("getObsIndicator:" + obs + " does not have value for " + cex_indicator)
+ }
+
  def isPrimary(m:Model, indicator: Resource) : Boolean = {
-   m.contains(indicator,rdf_type,wf_onto_PrimaryIndicator)
+   val r = m.contains(indicator,rdf_type,wf_onto_PrimaryIndicator)
+   r
  }
  
   def isPrimary(m:Model, indicatorName: String) : Boolean = {
@@ -209,5 +225,22 @@ object CexUtils {
        m.contains(indicator,rdf_type,wf_onto_PrimaryIndicator)
    }
  }
+
+ def isPrimaryObs(m:Model, obs: Resource) : Boolean = {
+   val indicator = getObsIndicator(m,obs)
+   isPrimary(m,indicator)
+ }
+
+ def newResource(m: Model) = newResourceNoBlankNode(m,webindex_bnode)
+ def newObs(m: Model) = newResourceNoBlankNode(m, wi_obsComputed)
+ def newComp(m: Model) = newResourceNoBlankNode(m, wi_compComputed)
+ def newDataset(m: Model) = newResourceNoBlankNode(m, wi_datasetComputed)
+ def newSlice(m: Model) = newResourceNoBlankNode(m, wi_sliceComputed)
+
+ def mkSlice(m: Model, s: String) : Resource = m.createResource(wi_slice + s)
+ def mkSlice(m:Model, r: Resource) : Resource = mkSlice(m,r.getLocalName)
+  
+ def mkRanking(m: Model, s: String) : Resource  = m.createResource(wi_ranking + s)
+ def mkRanking(m: Model, r: Resource): Resource = mkRanking(m,r.getLocalName)
 
 }
