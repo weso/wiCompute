@@ -18,8 +18,8 @@ class SimpleComponentsSuite extends FunSpec
   val year = 2011
   val model = JenaUtils.parseFromURI("file:examples/example-imputed.ttl")
   val expanded = AddComputations.addComputations(model,year)
-
-
+  JenaUtils.model2File(expanded, "examples/simple-generated.ttl", "TURTLE")
+  
   def ValidateComponentValues(country: String) : Unit = {
 
     describe("Validate all component values for " + country) {

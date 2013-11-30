@@ -109,7 +109,7 @@ object AddDatasets extends App {
    } 
    isPrimary
  }
- 
+
  def normalizedDatasets(m:Model) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    val datasetsIter = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
@@ -123,41 +123,6 @@ object AddDatasets extends App {
        
        val computation = newComp(m)
        newModel.add(computation,rdf_type,cex_NormalizeDataSet)
-       newModel.add(computation,cex_dataSet,dataset)
-       newModel.add(newDataSet,cex_computation,computation)
-       newModel.add(newDataSet,sdmxAttribute_unitMeasure,dbpedia_Year)
-       newModel.add(newDataSet,qb_structure,wf_onto_DSD)
-
-       val iterSlices = m.listStatements(dataset,qb_slice,null : RDFNode)
-       while (iterSlices.hasNext) {
-         val slice = iterSlices.next.getObject().asResource()
-         val newS = newSlice(m)
-         newModel.add(newS,rdf_type,qb_Slice)
-         newModel.add(newS,cex_indicator,findProperty_asResource(m,slice,cex_indicator))
-         newModel.add(newS,wf_onto_ref_year,findProperty_asLiteral(m,slice,wf_onto_ref_year))
-         newModel.add(newS,qb_sliceStructure,wf_onto_sliceByArea)
-         newModel.add(newDataSet,qb_slice,newS)
-       }
-     }
-   }
-   newModel.setNsPrefixes(PREFIXES.cexMapping)
-   newModel
- }
-
- def adjustedDatasets(m:Model) : Model = {
-   val newModel = ModelFactory.createDefaultModel()
-   val datasetsIter = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
-   
-   while (datasetsIter.hasNext) {
-     val dataset = datasetsIter.nextResource()
-     val computation = findProperty_asResource(m,dataset,cex_computation)
-     val typeComputation = findProperty(m,computation,rdf_type)
-     if (typeComputation == cex_NormalizeDataSet) {
-       val newDataSet = newDataset(m)
-       newModel.add(newDataSet,rdf_type,qb_DataSet)
-       
-       val computation = newComp(m)
-       newModel.add(computation,rdf_type,cex_AdjustDataSet)
        newModel.add(computation,cex_dataSet,dataset)
        newModel.add(newDataSet,cex_computation,computation)
        newModel.add(newDataSet,sdmxAttribute_unitMeasure,dbpedia_Year)

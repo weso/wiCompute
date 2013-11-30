@@ -54,7 +54,7 @@ class TableComputationsSuite extends FunSpec
  	  val C4 = ResourceFactory.createResource("C4")
 
  	  val groupings = Map(C1 -> Set(A,B), C2 -> Set(C,D), C3 -> Set(E))
- 	  val newTable = table.group(groupings,weights)
+ 	  val newTable = table.group(groupings,weights,true)
  	  
  	  newTable.lookupValue(C1,USA) should be(3.25)
  	  newTable.lookupList(C1,USA).toList should be (List((A,4,1),(B,5,0.5)))

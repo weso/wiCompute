@@ -74,7 +74,17 @@ object CexUtils {
 
  def getDatasets(m:Model):Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,qb_DataSet).toList
- 
+   
+ def getYears(m:Model):Seq[Int] = {
+   val slices = m.listSubjectsWithProperty(rdf_type,qb_Slice).toList
+   slices.map(s => getYear(m,s))
+   ???
+ }
+
+ def getYear(m:Model, r:Resource) : Option[Int] = {
+   ??? // if ()
+ }
+
  def getCountries(m:Model):Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,wf_onto_Country).toList
 
@@ -178,6 +188,7 @@ object CexUtils {
      throw new Exception("findProperty_asProperty: value of property " + p + 
                          " for resource " + r + " is " + vr + ", but should be an URI")
  }
+
  def copyProperties(to:Resource, modelTo: Model, ps:Seq[Property],from:Resource,modelFrom:Model): Unit = {
    ps.foreach(p => copyProperty(to,modelTo,p,from,modelFrom))
  }

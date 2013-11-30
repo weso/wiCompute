@@ -20,7 +20,7 @@ class WebIndexDataSuite extends FunSpec
     val expanded = AddComputations.addComputations(model,2013)
 
     it("Should maintain imputed values") {
-      matchDoublesDataset(expanded,"ITU_R",2011,"ARE","ITU_R-Imputed",40.5662945820855)
+      matchDoublesDataset(expanded,"ITU_R",2012,"ARG","ITU_R-Imputed",0.0847)
     }
 
     it("Check Normalized ARG Q11 ") {
@@ -59,9 +59,9 @@ class WebIndexDataSuite extends FunSpec
       matchDoublesCompType(expanded,"WI_D",2012,"CHL",cex_Normalize,0.379)
     }
 
-    it("Check Group CHL Affordability 2012") {
+/*    it("Check Group CHL Affordability 2012") {
       matchDoublesCompType(expanded,wi_component + "affordability",2013,"CHL",cex_Normalize,0.379)
-    }
+    } */
 
 }
   
