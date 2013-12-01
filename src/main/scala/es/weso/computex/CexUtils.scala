@@ -25,6 +25,7 @@ import com.hp.hpl.jena.rdf.model.Property
 import PREFIXES._
 import scala.collection.JavaConversions._
 import es.weso.utils.StatsUtils._
+import scala.collection.SortedSet
 
 object CexUtils {
  
@@ -44,14 +45,39 @@ object CexUtils {
     throw new Exception("Cannot find computation for resource " + r)
  }
 
- def getValue(m:Model,obs:Resource) : Option[Double] = {
+ def getYear(m:Model,r:Resource) : Int = {
+   findYear(m,r) match {
+     case Some(y) => y
+     case None => throw new Exception("Cannot find year of " + r)
+   }
+ }
+
+ def getValue(m:Model,r:Resource) : Double = {
+   findValue(m,r) match {
+     case Some(v) => v
+     case None => throw new Exception("Cannot find value of " + r)
+   }
+ }
+
+ def findValue(m:Model,obs:Resource) : Option[Double] = {
    if (hasProperty(m,obs,cex_value)) {
      Some(findProperty(m,obs,cex_value).asLiteral.getDouble)
    } else 
      None
  }
 
-  def findDatasetWithComputation(m:Model, compType : Resource) : 
+ def findComputationYear(m:Model, comp: Resource): Option[Int] = {
+   if (hasProperty(m,comp,cex_filterDimension) && 
+       findProperty_asResource(m,comp,cex_filterDimension) == wf_onto_ref_year) {
+     if (hasProperty(m,comp,cex_filterValue)) {
+       Some(findProperty(m,comp,cex_filterValue).asLiteral.getInt)
+     } else
+       None
+   } else 
+     None
+ }
+
+ def findDatasetWithComputation(m:Model, compType : Resource) : 
 	  		Option[(Resource,Resource)] = {
    val iterDatasets = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
    while (iterDatasets.hasNext) {
@@ -62,27 +88,95 @@ object CexUtils {
    }
    None
  }
-  
- def getIndicators(m:Model): Seq[Resource] = 
+
+  /**
+   * Finds a dataset with a given computation and year
+   */
+  def findDatasetWithComputationYear(m:Model, compType : Resource, year: Int) : 
+	  		Option[(Resource,Resource)] = {
+   val iterDatasets = m.listSubjectsWithProperty(rdf_type,qb_DataSet)
+   var pairFound : Option[(Resource,Resource)]= None
+   while (iterDatasets.hasNext && pairFound == None) {
+     val dataset = iterDatasets.next
+     if (hasComputationType(m,dataset,compType)) {
+       val computation = findProperty_asResource(m,dataset,cex_computation)
+       findComputationYear(m,computation) match {
+         case Some(y) => if (y == year) { pairFound = Some(dataset,computation) }
+         case None => println("Computation " + computation + " of type " + compType + " but no year")
+       }
+     }
+   }
+   pairFound
+ }
+
+ /**
+  * Returns the list of datasets 
+  */
+ def getDatasets(m:Model):Seq[Resource] = 
+   m.listSubjectsWithProperty(rdf_type,qb_DataSet).toList
+ 
+ /**
+  *   Returns the slices of a dataset
+  */  
+ def getDatasetSlices(m:Model,dataset: Resource): Seq[Resource] = {
+   m.listObjectsOfProperty(dataset,qb_slice).map(_.asResource).toList
+ }
+
+ /**
+  * Returns a the list of pairs (slice,indicator) of a dataset
+  */
+ def getDatasetSlicesIndicators(m:Model,dataset: Resource): Seq[(Resource,Resource)] = {
+   val ls = m.listObjectsOfProperty(dataset,qb_slice).map(_.asResource).toList
+   ls.map(slice => { 
+     val indicator = findProperty_asResource(m,slice,cex_indicator)
+     (slice,indicator)
+   })
+ }
+
+ def getComputationDatasets(m:Model,comp: Resource): Seq[Resource] = {
+   m.listObjectsOfProperty(comp,cex_dataSet).map(_.asResource).toList
+ }
+ 
+ /**
+  * Returns the list of observations of a slice
+  */
+ def getObservationsSlice(m:Model, slice: Resource): Seq[Resource] = {
+   m.listObjectsOfProperty(slice,qb_observation).map(_.asResource).toList
+ }
+
+   
+   def getIndicators(m:Model): Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,cex_Indicator).toList
  
+ def getPrimaryIndicators(m:Model): Seq[Resource] = 
+   m.listSubjectsWithProperty(rdf_type,wf_onto_PrimaryIndicator).toList
+
+ def getSecondaryIndicators(m:Model): Seq[Resource] = 
+   m.listSubjectsWithProperty(rdf_type,wf_onto_SecondaryIndicator).toList
+
  def getComponents(m:Model): Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,cex_Component).toList
 
  def getSubindexes(m:Model): Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,cex_SubIndex).toList
 
- def getDatasets(m:Model):Seq[Resource] = 
-   m.listSubjectsWithProperty(rdf_type,qb_DataSet).toList
    
- def getYears(m:Model):Seq[Int] = {
-   val slices = m.listSubjectsWithProperty(rdf_type,qb_Slice).toList
-   slices.map(s => getYear(m,s))
-   ???
+ def getYears(m:Model):SortedSet[Int] = {
+   val slices : Seq[Resource] = m.listSubjectsWithProperty(rdf_type,qb_Slice).toList
+   setOfDefined(slices.map(s => findYear(m,s)))
+ }
+ 
+ def setOfDefined(s: Seq[Option[Int]]): SortedSet[Int] = {
+   SortedSet(s.filter(_.isDefined).map(_.get): _*)
+ }
+ 
+ def getSlices(m:Model, dataset: Resource) : Seq[Resource] = {
+   m.listStatements(dataset,qb_slice,null : RDFNode).map(st => st.getObject.asResource).toList
  }
 
- def getYear(m:Model, r:Resource) : Option[Int] = {
-   ??? // if ()
+ def findYear(m:Model, r:Resource) : Option[Int] = {
+   for (y <- getProperty(m,r,wf_onto_ref_year); if y.isLiteral) 
+   yield (y.asLiteral.getInt)
  }
 
  def getCountries(m:Model):Seq[Resource] = 
@@ -92,13 +186,18 @@ object CexUtils {
    getDatasets(m).find(d => d.getLocalName == datasetName)
  }
 
- def getProperty(m: Model, r: Resource, p: Property) : Option[Resource] = {
-   if (hasProperty(m,r,p)) Some(findProperty_asResource(m,r,p))
+ def getProperty(m: Model, r: Resource, p: Property) : Option[RDFNode] = {
+   if (hasProperty(m,r,p)) Some(findProperty(m,r,p))
    else None
  }
  
+ def getProperty_asResource(m: Model, r: Resource, p: Property) : Option[Resource] = {
+   if (hasProperty(m,r,p)) Some(findProperty_asResource(m,r,p))
+   else None
+ }
+
  def getDataset(m: Model, r: Resource) : Option[Resource] = {
-   getProperty(m,r,qb_dataSet)
+   getProperty_asResource(m,r,qb_dataSet)
  }
 
  def findIndicator(m: Model, indicatorName: String) : Option[Resource] = {
@@ -149,15 +248,15 @@ object CexUtils {
    yield lsObs.head
  }
 
- def findValue(m:Model, indicator: Resource, year: Int, country: Resource, cond: Resource => Boolean) : Option[Double] = {
+ def lookupValue(m:Model, indicator: Resource, year: Int, country: Resource, cond: Resource => Boolean) : Option[Double] = {
    for ( o <- findObs(m,indicator,year,country,cond);
-         v <- getValue(m,o))
+         v <- findValue(m,o))
    yield v
  }
 
- def findValue(m:Model, indicatorName: String, year: Int, countryCode: String, cond: Resource => Boolean) : Option[Double] = {
+ def lookupValue(m:Model, indicatorName: String, year: Int, countryCode: String, cond: Resource => Boolean) : Option[Double] = {
    for ( o <- findObs(m,indicatorName,year,countryCode,cond);
-         v <- getValue(m,o))
+         v <- findValue(m,o))
    yield v
  }
 
@@ -167,17 +266,17 @@ object CexUtils {
        case None => false
        case Some(d) => d.getLocalName == datasetName
     }
-   findValue(m,indicatorName,year,countryCode,cond)
+   lookupValue(m,indicatorName,year,countryCode,cond)
  }
 
  def findValueCompType(m:Model, indicatorName: String, year: Int, countryCode: String, compType: Resource) : Option[Double] = {
    val cond : Resource => Boolean = r => hasComputationType(m,r,compType)
-   findValue(m,indicatorName,year,countryCode,cond)
+   lookupValue(m,indicatorName,year,countryCode,cond)
  }
    
  def findValueCompType(m:Model, indicator: Resource, year: Int, country: Resource, compType: Resource) : Option[Double] = {
    val cond : Resource => Boolean = r => hasComputationType(m,r,compType) 
-   findValue(m,indicator,year,country,cond)
+   lookupValue(m,indicator,year,country,cond)
  }
  
   def findProperty_asProperty(m:Model, r:Resource, p:Property): Property = {
@@ -216,12 +315,12 @@ object CexUtils {
    findProperty(m,obs,wf_onto_ref_year).asLiteral.getInt
  }
 
- def getObsIndicator(m: Model, obs: Resource) : Resource = {
-   if (hasProperty(m,obs,cex_indicator)) 
-     findProperty_asResource(m,obs,cex_indicator)
+ def getIndicator(m: Model, r: Resource) : Resource = {
+   if (hasProperty(m,r,cex_indicator)) 
+     findProperty_asResource(m,r,cex_indicator)
    else 
      throw 
-      new Exception("getObsIndicator:" + obs + " does not have value for " + cex_indicator)
+      new Exception("getIndicator:" + r + " does not have value for " + cex_indicator)
  }
 
  def isPrimary(m:Model, indicator: Resource) : Boolean = {
@@ -237,21 +336,45 @@ object CexUtils {
    }
  }
 
- def isPrimaryObs(m:Model, obs: Resource) : Boolean = {
-   val indicator = getObsIndicator(m,obs)
+ def isPrimaryResource(m:Model, r: Resource) : Boolean = {
+   val indicator = getIndicator(m,r)
    isPrimary(m,indicator)
  }
 
- def newResource(m: Model) = newResourceNoBlankNode(m,webindex_bnode)
- def newObs(m: Model) = newResourceNoBlankNode(m, wi_obsComputed)
+
+ // TODO: refactor this ugly code...
+ def isPrimaryDataset(m : Model, d: Resource) : Boolean = {
+   var foundPrimary = false
+   if (hasProperty(m,d,qb_slice)) {
+     val iterSlices = m.listObjectsOfProperty(d,qb_slice)
+     while (iterSlices.hasNext) {
+       val slice = iterSlices.next.asResource
+       if (isPrimaryResource(m,slice)) foundPrimary = true
+     }
+   } 
+   foundPrimary
+ }
+
+
+ def newResource(m: Model) = newResourceNoBlankNode(m, webindex_bnode)
+ def newObs(m: Model, year:Int) = newResourceNoBlankNode(m, wi_obsComputed + "_" + year + "_")
  def newComp(m: Model) = newResourceNoBlankNode(m, wi_compComputed)
+ def newComp(m: Model,year:Int) = newResourceNoBlankNode(m, wi_compComputed+"_"+year+"_")
  def newDataset(m: Model) = newResourceNoBlankNode(m, wi_datasetComputed)
+ def newDataset(m: Model, year:Int) = newResourceNoBlankNode(m, wi_datasetComputed + "_" + year+"_")
+ def newSlice(m: Model, year:Int) = newResourceNoBlankNode(m, wi_sliceComputed+ "_" + year+"_")
  def newSlice(m: Model) = newResourceNoBlankNode(m, wi_sliceComputed)
 
- def mkSlice(m: Model, s: String) : Resource = m.createResource(wi_slice + s)
- def mkSlice(m:Model, r: Resource) : Resource = mkSlice(m,r.getLocalName)
+ def mkSlice(m: Model, s: String, year: Int) : Resource = 
+   m.createResource(wi_slice + s + "_" + year)
+
+ def mkSlice(m:Model, r: Resource,year:Int) : Resource = 
+   mkSlice(m,r.getLocalName,year)
   
- def mkRanking(m: Model, s: String) : Resource  = m.createResource(wi_ranking + s)
- def mkRanking(m: Model, r: Resource): Resource = mkRanking(m,r.getLocalName)
+ def mkRanking(m: Model, s: String, year:Int) : Resource  = 
+   m.createResource(wi_ranking + s + "_" + year)
+
+ def mkRanking(m: Model, r: Resource, year:Int): Resource = 
+   mkRanking(m,r.getLocalName,year)
 
 }

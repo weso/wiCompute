@@ -15,7 +15,7 @@ class SimpleComponentsSuite extends FunSpec
 	with ShouldMatchers 
 	with ComputeUtilsSuite {
 
-  val year = 2011
+  val year = 2012
   val model = JenaUtils.parseFromURI("file:examples/example-imputed.ttl")
   val expanded = AddComputations.addComputations(model,year)
   JenaUtils.model2File(expanded, "examples/simple-generated.ttl", "TURTLE")

@@ -27,7 +27,7 @@ import scala.collection.JavaConverters
 import es.weso.utils.StatsUtils._
 import CexUtils._
 
-class AddComputations(arguments: Array[String],
+class AddComputationsOpts(arguments: Array[String],
     onError: (Throwable, Scallop) => Nothing
     ) extends ScallopConf(arguments) {
 
@@ -41,9 +41,8 @@ class AddComputations(arguments: Array[String],
         			descr = "Turtle file")
     val output  = opt[String]("out",
     				descr = "Output file")
-    val year = opt[Int]("year", 
-                    required=true,
-    				descr = "Year of index")
+    val year  	= opt[Int]("year",
+    				descr = "Year of current WebIndex")
     val version = opt[Boolean]("version", 
     				noshort = true, 
     				descr = "Print version")
@@ -86,7 +85,7 @@ object AddComputations extends App {
              val builder = Seq.newBuilder[Double]
              while (iterObsMean.hasNext) {
                val obs = iterObsMean.nextNode.asResource
-               val v = getValue(m,obs)
+               val v = findValue(m,obs)
                if (v.isDefined) builder += v.get
              }
              val seqObs = builder.result
@@ -95,13 +94,13 @@ object AddComputations extends App {
              val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
              while (iterObs.hasNext) {
                val obsFrom = iterObs.nextNode.asResource
-               val obsTo = newObs(m)
+               val obsTo = newObs(m,yearTo.asLiteral.getInt)
                newModel.add(sliceTo,qb_observation,obsTo)
                newModel.add(obsTo,rdf_type,qb_Observation)
                copyProperties(obsTo,newModel,
                    Seq(wf_onto_ref_area, wf_onto_ref_year, cex_indicator),obsFrom,m)
 
-               getValue(m,obsFrom) match {
+               findValue(m,obsFrom) match {
                  case None => {}
                  case Some(value) => {
                     val area = findProperty(m,obsFrom,wf_onto_ref_area)
@@ -132,79 +131,80 @@ object AddComputations extends App {
    newModel
  }
 
- // Todo: Unfinnished (Check Cluster.sparql query)
- def addCluster(m:Model) : Model = {
+ def addCluster(m:Model, year:Int, includePrimaries: Boolean) : Model = {
+   println("Adding cluster..." + year + ". include: " + includePrimaries)
    val newModel = ModelFactory.createDefaultModel()
-   findDatasetWithComputation(m,cex_ClusterDataSets) match {
+   findDatasetWithComputationYear(m, cex_ClusterDataSets,year) match {
      case None => {
        logger.warn("No dataset with computation " + cex_ClusterDataSets)
      }
+   
      case Some((datasetTo,computation)) => {
-        val dim = findProperty_asProperty(m,computation,cex_dimension)
-        val valueDim = findProperty(m,computation,cex_value)
-        val yearDim = valueDim.asLiteral.getInt
-          
-        val iterSlices = m.listObjectsOfProperty(datasetTo,qb_slice)
-        while (iterSlices.hasNext) {
-         val sliceTo = iterSlices.nextNode().asResource
-         val indicatorTo = findProperty_asResource(m,sliceTo,cex_indicator)
-
-        val iterDataSets = m.listObjectsOfProperty(computation,cex_dataSet)
-        while (iterDataSets.hasNext) {
-         val datasetFrom = iterDataSets.nextNode().asResource
-
-         val iterSlicesFrom = m.listObjectsOfProperty(datasetFrom,qb_slice)
-         while (iterSlicesFrom.hasNext) {
-            val sliceFrom = iterSlicesFrom.nextNode.asResource
-            val valueDimFrom = findProperty(m,sliceTo,dim)
-        
-            if (valueDimFrom == valueDim) {
-             val indicatorFrom = findProperty_asResource(m,sliceFrom,cex_indicator)
-             if (indicatorTo == indicatorFrom) {
-               val iterObs = m.listObjectsOfProperty(sliceFrom,qb_observation)
-               while (iterObs.hasNext) {
-                 val obsFrom = iterObs.nextNode().asResource()
-                 if (mustBeClustered(m,obsFrom,yearDim)) { 
-                  val obsTo = newObs(m)
-                  newModel.add(sliceTo,qb_observation,obsTo)
-                  copyProperties(obsTo,newModel,Seq(wf_onto_ref_area, cex_value),obsFrom,m)
-                  newModel.add(obsTo,wf_onto_ref_year,valueDim)
+         for ((sliceTo,indicatorTo) <- getDatasetSlicesIndicators(m,datasetTo)) {
+           // Search datasets from which to copy observations
+           for (datasetFrom <- getComputationDatasets(m,computation)) {
+             for ((sliceFrom,indicatorFrom) <- getDatasetSlicesIndicators(m,datasetFrom)
+                 ) {
+               if (indicatorTo == indicatorFrom) {
+                 if (mustBeClustered(m,sliceFrom,year,includePrimaries)) {
+                  for (obsFrom <- getObservationsSlice(m,sliceFrom)) {
+                   val obsTo = newObs(m,year)
+                   newModel.add(sliceTo,qb_observation,obsTo)
+                   copyProperties(obsTo,newModel,Seq(wf_onto_ref_area, cex_value),obsFrom,m)
+                   newModel.add(obsTo,wf_onto_ref_year,literalInt(year))
+                  }
                  }
-               } 
+               }
              }
-           } else println("...doesn't match valueDim")
-         } 
-       }
-      }
+           }
+         }
      }
    }
    newModel
  }
 
 
- def mustBeClustered(m: Model, obs: Resource, year: Int) : Boolean = {
-   if (isPrimaryObs(m,obs)) getObsYear(m,obs) == year
-   else getObsYear(m,obs) == (year - 1)
+ /**
+  * If we are including primaries, then we collect the primary indicators
+  * with the same year and the secondary indicators of previous year
+  * Otherwise, we collect the secondary indicators of previous year
+  */
+ def mustBeClustered(
+     m: Model, 
+     slice: Resource, 
+     year: Int,
+     includePrimaries: Boolean) : Boolean = {
+   if (includePrimaries) {
+    if (isPrimaryResource(m,slice)) getYear(m,slice) == year
+    else getYear(m,slice) == (year - 1)
+   } else {
+     getYear(m,slice) == (year - 1)
+   }
  }
  
  
- def groupClusters(m:Model) : Model = {
-   groupMean(m,cex_GroupClusters,wi_weightSchema_indicatorWeights,cex_Component,true)
+ def groupClusters(m:Model,year:Int) : Model = {
+   groupMean(m,cex_GroupClusters,wi_weightSchema_indicatorWeights,cex_Component,year,true)
  }
 
 
- def groupSubIndex(m:Model) : Model = {
-   groupMean(m,cex_GroupSubIndex,wi_weightSchema_componentWeights,cex_SubIndex,false)
+ def groupSubIndex(m:Model,year:Int) : Model = {
+   groupMean(m,cex_GroupSubIndex,wi_weightSchema_componentWeights,cex_SubIndex,year,false)
  }
 
  
- def groupIndex(m:Model) : Model = {
-   groupMean(m,cex_GroupIndex,wi_weightSchema_subindexWeights,cex_Index,false)
+ def groupIndex(m:Model,year:Int) : Model = {
+   groupMean(m,cex_GroupIndex,wi_weightSchema_subindexWeights,cex_Index,year,false)
  }
 
- def groupMean(m:Model, compType: Resource, weightSchema: Resource, level: Resource, doMean: Boolean) : Model = {
+ def groupMean(m:Model, 
+     compType: Resource, 
+     weightSchema: Resource, 
+     level: Resource, 
+     year: Int,
+     doMean: Boolean) : Model = {
    val newModel = ModelFactory.createDefaultModel()
-   findDatasetWithComputation(m,compType) match {
+   findDatasetWithComputationYear(m,compType,year) match {
      case None =>{
        logger.warn("No dataset with computation " + compType)
        newModel
@@ -231,7 +231,7 @@ object AddComputations extends App {
          val year = findProperty(oldModel,sliceTo,wf_onto_ref_year)
          for (area <- table.getAreas) {
            if (table.contains(indicator,area)) {
-        	 val obs = newObs(newModel)
+        	 val obs = newObs(newModel,year.asLiteral.getInt)
              newModel.add(obs,rdf_type,qb_Observation)
              newModel.add(obs,cex_indicator,indicator)
              newModel.add(obs,wf_onto_ref_area,area)
@@ -249,7 +249,7 @@ object AddComputations extends App {
    while (iterWeights.hasNext) {
       val weightNode = iterWeights.nextNode().asResource()
       val element = findProperty_asResource(m,weightNode,cex_element)
-      val weight  = getValue(m,weightNode).get
+      val weight  = getValue(m,weightNode)
       weightsBuilder += ((element,weight))
     }
     weightsBuilder.result
@@ -294,7 +294,12 @@ object AddComputations extends App {
  }
  
 
- def addValueComputed(m: Model, obs: Resource, indicator: Resource, area: Resource, table: TableComputations, weights: Resource) : Unit = {
+ def addValueComputed(m: Model, 
+     obs: Resource, 
+     indicator: Resource, 
+     area: Resource, 
+     table: TableComputations, 
+     weights: Resource) : Unit = {
    m.add(obs,cex_value,literalDouble(table.lookupValue(indicator,area)))
    val comp = newComp(m)
    m.add(obs,cex_computation,comp)
@@ -313,30 +318,49 @@ object AddComputations extends App {
    }
  }
  
- def addComputations(m: Model,year:Int) : Model = {
-   AddDatasets.addDatasets(m,year)
+ def addComputations(m: Model,primaryYear: Int) : Model = {
+
+   // Removes the first year because we secondary indicators of one year are based
+   // on year before
+   val years = getYears(m).tail + primaryYear
+
+   m.add(AddDatasets.normalizedDatasets(m))
    val normalize = addNormalize(m)
    println("Normalized: " + normalize.size)
    m.add(normalize)  
 
-   val clustered = addCluster(m)
-   println("Clustered: " + clustered.size)
-   m.add(clustered)
+   for (year <- years) {
+     println("Year: " + year)
+     // Create datasets of indicators clustered by year 
+     // in case it is the last year, add primary indicators also
+     val includePrimaries = year == primaryYear
+     m.add(AddDatasets.clusterIndicatorsDataset(m,year,includePrimaries))
+	 val clustered = addCluster(m,year, includePrimaries)
+     println("Clustered: " + clustered.size)
+     m.add(clustered)
    
-   val groups = groupClusters(m)
-   println("Groups: " + groups.size)
-   m.add(groups) 
+     // Create dataset of groups of indicators (components)
+     m.add(AddDatasets.clustersGroupedDataset(m,year))
+     val groups = groupClusters(m,year)
+     println("Groups: " + groups.size)
+     m.add(groups) 
 
-   val subindexes = groupSubIndex(m)
-   println("Subindexes: " + subindexes.size)
-   m.add(subindexes) 
+     // Create dataset of subindex (subindexes)
+     m.add(AddDatasets.subindexGroupedDataset(m,year))
+     val subindexes = groupSubIndex(m,year)
+     println("Subindexes: " + subindexes.size)
+     m.add(subindexes) 
 
-   val index = groupIndex(m)	
-   println("Index: " + index.size)
-   m.add(index) 
+     // create dataset of index
+     m.add(AddDatasets.compositeDataset(m,year))
+	 val index = groupIndex(m,year)	
+     println("Index: " + index.size)
+     m.add(index) 
 
-   AddRanking.addRankings(m) 
-   
+     m.add(AddDatasets.rankingsDataset(m,year))
+     AddRanking.addRankings(m,year) 
+
+   }
    m
  } 
 
@@ -346,12 +370,12 @@ object AddComputations extends App {
   
   val conf 			= ConfigFactory.load()
   
-  val opts 	= new AddDatasetsOpts(args,onError)
+  val opts 	= new AddComputationsOpts(args,onError)
   try {
    val model = ModelFactory.createDefaultModel
    val inputStream = FileManager.get.open(opts.fileName())
    model.read(inputStream,"","TURTLE")
-   val newModel = addComputations(model, opts.year())
+   val newModel = addComputations(model,opts.year())
    if (opts.output.get == None) newModel.write(System.out,"TURTLE")
    else {
      val fileOutput = opts.output()

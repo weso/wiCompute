@@ -722,13 +722,13 @@ slice:D11-Imputed
 slice:Q1-Ordered
       a       qb:Slice ;
       cex:indicator indicator:Q1 ;
-      wf-onto:ref-year 2011 ;
+      wf-onto:ref-year 2012 ;
       qb:sliceStructure wf-onto:sliceByArea .
 
 slice:Q2-Ordered
       a       qb:Slice ;
       cex:indicator indicator:Q2 ;
-      wf-onto:ref-year 2011 ;
+      wf-onto:ref-year 2012 ;
       qb:sliceStructure wf-onto:sliceByArea .
 
 
@@ -2139,7 +2139,7 @@ obs:EQ1-S a wf-onto:Observation ;
 		 wf-onto:ref-area country:ESP ;
 		 cex:computation [a cex:Raw ] ;
 		 cex:indicator indicator:Q1 ;
-		 wf-onto:ref-year 2011 ;
+		 wf-onto:ref-year 2012 ;
          wf-onto:sheet-type wf-onto:Raw ;
 		 cex:value 6 .
 
@@ -2156,7 +2156,7 @@ obs:EQ2-S a wf-onto:Observation ;
 		 wf-onto:ref-area country:ESP ;
 		 cex:computation [a cex:Raw ] ;
 		 cex:indicator indicator:Q2 ;
-		 wf-onto:ref-year 2011 ;
+		 wf-onto:ref-year 2012 ;
          wf-onto:sheet-type wf-onto:Raw ;
 		 cex:value 7 .
 
@@ -2173,7 +2173,7 @@ obs:FQ1-S a wf-onto:Observation ;
 		 wf-onto:ref-area country:FIN ;
 		 cex:computation [a cex:Raw ] ;
 		 cex:indicator indicator:Q1 ;
-		 wf-onto:ref-year 2011 ;
+		 wf-onto:ref-year 2012 ;
          wf-onto:sheet-type wf-onto:Raw ;
 		 cex:value 7 .
 
@@ -2189,7 +2189,7 @@ obs:FQ2-S a wf-onto:Observation ;
 		 sdmx-concept:obsStatus cex:Raw;
 		 wf-onto:ref-area country:FIN ;
 		 cex:indicator indicator:Q2 ;
-		 wf-onto:ref-year 2011 ;
+		 wf-onto:ref-year 2012 ;
          wf-onto:sheet-type wf-onto:Raw ;
 		 cex:value 3 .
 
@@ -2206,7 +2206,7 @@ obs:CQ1-S a wf-onto:Observation ;
 		 sdmx-concept:obsStatus cex:Raw;
 		 wf-onto:ref-area country:CHL ;
 		 cex:indicator indicator:Q1 ;
-		 wf-onto:ref-year 2011 ;
+		 wf-onto:ref-year 2012 ;
          wf-onto:sheet-type wf-onto:Raw ;
 		 cex:value 8 .
 
@@ -2222,6 +2222,6 @@ obs:CQ2-S a wf-onto:Observation ;
 		 sdmx-concept:obsStatus cex:Raw;
 		 wf-onto:ref-area country:CHL ;
 		 cex:indicator indicator:Q2 ;
-		 wf-onto:ref-year 2011 ;
+		 wf-onto:ref-year 2012 ;
          wf-onto:sheet-type wf-onto:Raw ;
 		 cex:value 4 .

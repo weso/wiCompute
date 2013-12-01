@@ -19,15 +19,14 @@ class WebIndexComponentsSuite extends FunSpec
   val expanded = AddComputations.addComputations(model,2013)
 
 
-  def ValidateComponentValues(country: String) : Unit = {
+  def ValidateComponentValues(country: String,year:Int) : Unit = {
 
-    describe("Validate all component values for " + country) {
+    describe("Validate all component values for " + country + " and year " + year) {
       info("Validating " + country)
-      val map = getTableValues("componentValues" + country)
+      val map = getTableValues("componentValues" + country+"_"+year)
       map.keys.foreach {
         k => { 
           it("Should validate " + k + " for country " + country) {
-            val year = 2013 
             val i = findComponent(expanded,k).get
             val c = findCountry(expanded,country).get
             map(k) match {
@@ -35,17 +34,15 @@ class WebIndexComponentsSuite extends FunSpec
               case Some(d) => matchDoublesCompType(expanded,i,year,c,cex_GroupMean,d)
             }
           }
-          
        }
       }
     }
       
-    describe("Validate subindex values for " + country) {
-      val map = getTableValues("subindexValues" + country)
+    describe("Validate subindex values for " + country + " and year " + year) {
+      val map = getTableValues("subindexValues" + country+"_"+year)
       map.keys.foreach {
         k => { 
           it("Should validate " + k + " for country " + country) {
-            val year = 2013 
             val i = if (k=="composite") wi_index_index
                     else findSubIndex(expanded,k).get
             val c = findCountry(expanded,country).get
@@ -63,6 +60,8 @@ class WebIndexComponentsSuite extends FunSpec
     
   }
   
-  ValidateComponentValues("ARG")
-  ValidateComponentValues("ESP")
+  ValidateComponentValues("ARG",2008)
+  ValidateComponentValues("ARG",2013)
+  ValidateComponentValues("ARG",2012)
+  ValidateComponentValues("ESP",2013)
 }

@@ -16,7 +16,7 @@ class AddComputationsSuite extends FunSpec
   
   describe("Add computations") {
     val model = JenaUtils.parseFromURI("file:examples/example-imputed.ttl")
-    val expanded = AddComputations.addComputations(model,2011)
+    val expanded = AddComputations.addComputations(model,2012)
 
     it("Should maintain imputed values") {
       findValueInDataset(expanded,"A",2009,"ESP","A-Imputed") should be (Some(2.0))

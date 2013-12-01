@@ -194,6 +194,8 @@ object PREFIXES {
  lazy val cex_mean					= property("cex","mean")
  lazy val cex_stdDesv				= property("cex","stdDesv")
  lazy val cex_dimension				= property("cex","dimension")
+ lazy val cex_filterDimension		= property("cex","filterDimension")
+ lazy val cex_filterValue			= property("cex","filterValue")
  lazy val cex_group					= property("cex","group")
  lazy val cex_element				= property("cex","element")
  lazy val cex_highLow				= property("cex","highLow")
