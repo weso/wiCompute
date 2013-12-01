@@ -43,7 +43,7 @@ trait ComputeUtilsSuite extends FunSpec
       d1.toFloat should be(d2.toFloat plusOrMinus epsilon)
     }
   
-    def getDouble(v : Any) : Option[Double] = {
+  def getDouble(v : Any) : Option[Double] = {
     v match {
       case d : Double => Some(d)
       case _ => None
