@@ -92,25 +92,6 @@ object AddDatasets extends App {
    newModel
  }
 
- def mkClusterIndicators(m: Model, year: Int): Resource = {
-   m.createResource(wi_dataset + "ClusterIndicators_" + year)
- }
- 
- def mkClustersGrouped(m: Model, year: Int): Resource = {
-   m.createResource(wi_dataset + "ClustersGrouped_" + year)
- }
- 
- def mkSubIndexGrouped(m: Model,year: Int): Resource = {
-   m.createResource(wi_dataset + "SubIndexGrouped_" + year)
- }
-
- def mkComposite(m: Model,year: Int): Resource = {
-   m.createResource(wi_dataset + "Composite_" + year)
- }
-
- def mkRankings(m: Model,year: Int): Resource = {
-   m.createResource(wi_dataset + "Rankings_" + year)
- }
 
  def clusterIndicatorsDataset(m:Model, year:Int, includePrimaryIndicators: Boolean) : Model = {
    val newModel = ModelFactory.createDefaultModel()
@@ -260,7 +241,7 @@ object AddDatasets extends App {
    
    newModel.add(newDataSet,rdf_type,qb_DataSet)
    
-   val computation = newComp(m)
+   val computation = newComp(m,year)
    newModel.add(computation,rdf_type,cex_RankingDataset)
    newModel.add(computation,cex_dimension,wf_onto_ref_area)
    newModel.add(newDataSet,cex_computation,computation)
@@ -292,4 +273,41 @@ object AddDatasets extends App {
    newModel
  }
 
+ def scoresDataset(m:Model,year:Int) : Model = {
+   val newModel = ModelFactory.createDefaultModel()
+   val newDataSet = mkScores(m,year)
+   
+   newModel.add(newDataSet,rdf_type,qb_DataSet)
+   
+   val computation = newComp(m,year)
+   newModel.add(computation,rdf_type,cex_ScoreDataset)
+   newModel.add(computation,cex_dimension,wf_onto_ref_area)
+   newModel.add(newDataSet,cex_computation,computation)
+
+   newModel.add(newDataSet,sdmxAttribute_unitMeasure,dbpedia_Year)
+   newModel.add(newDataSet,qb_structure,wf_onto_DSD)
+
+   val iterSubindexes = m.listSubjectsWithProperty(rdf_type,cex_SubIndex)
+   while (iterSubindexes.hasNext) {
+     val subindex = iterSubindexes.nextResource
+     newModel.add(computation,cex_slice,mkSlice(m,subindex,year))
+     val sliceToScore = mkScore(m,subindex,year)
+     newModel.add(newDataSet,qb_slice,sliceToScore)
+     newModel.add(sliceToScore,rdf_type,qb_slice)
+     newModel.add(sliceToScore,cex_indicator,subindex)
+     newModel.add(sliceToScore,wf_onto_ref_year,literalInteger(year))
+     newModel.add(sliceToScore,qb_sliceStructure,wf_onto_sliceByArea)
+   }
+   
+   val sliceScoreComposite = mkScore(m,"Composite",year)
+   newModel.add(computation,cex_slice,mkSlice(m,"Composite",year))
+   newModel.add(newDataSet,qb_slice,sliceScoreComposite)
+   newModel.add(sliceScoreComposite,rdf_type,qb_slice)
+   newModel.add(sliceScoreComposite,cex_indicator,wi_index_index)
+   newModel.add(sliceScoreComposite,wf_onto_ref_year,literalInteger(year))
+   newModel.add(sliceScoreComposite,qb_sliceStructure,wf_onto_sliceByArea)
+
+   newModel.setNsPrefixes(PREFIXES.cexMapping)
+   newModel
+ }
 } 

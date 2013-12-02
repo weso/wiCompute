@@ -28,7 +28,7 @@ import scala.collection.JavaConverters
 
 object AddRanking extends App {
  
- def rankings(m:Model,year:Int) : Model = {
+ def rankings(m:Model) : Model = {
    val newModel = ModelFactory.createDefaultModel()
    
    // we suppose dim is wf_onto_ref_area
@@ -69,6 +69,7 @@ object AddRanking extends App {
         	  val obsToRank = iter2.next().asResource()
         	  val valueDim = findProperty(m,obsToRank,dim)
               val valueYear = findProperty(m,obsToRank,wf_onto_ref_year)
+              val year = valueYear.asLiteral.getInt
               val valueToRank = findProperty(m,obsToRank,cex_value)
               val ranking = sorted.indexWhere(p => p._1 == obsToRank) + 1 
       
@@ -97,8 +98,8 @@ object AddRanking extends App {
    newModel
  }
 
- def addRankings(m: Model,year:Int) : Model = {
-   m.add(rankings(m,year))
+ def addRankings(m: Model) : Model = {
+   m.add(rankings(m))
  } 
 
   
