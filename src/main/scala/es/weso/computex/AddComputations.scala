@@ -23,7 +23,7 @@ import com.hp.hpl.jena.rdf.model.Resource
 import com.hp.hpl.jena.rdf.model.Literal
 import com.hp.hpl.jena.rdf.model.Property
 import PREFIXES._
-import scala.collection.JavaConverters
+import scala.collection.JavaConversions._
 import es.weso.utils.StatsUtils._
 import CexUtils._
 
@@ -224,7 +224,7 @@ object AddComputations extends App {
    }
  }
 
- def saveTable(newModel : Model,oldModel : Model, dataset: Resource, table: TableComputations, weights: Resource) : Unit = {
+ private def saveTable(newModel : Model,oldModel : Model, dataset: Resource, table: TableComputations, weights: Resource) : Unit = {
    val iterSlicesTo = oldModel.listObjectsOfProperty(dataset,qb_slice)
    while (iterSlicesTo.hasNext) {
          val sliceTo = iterSlicesTo.next.asResource
@@ -244,7 +244,7 @@ object AddComputations extends App {
         }
  }
 
- def collectWeights(m:Model, w: Resource) = {
+ private def collectWeights(m:Model, w: Resource) = {
    val weightsBuilder = Map.newBuilder[Resource,Double]
    val iterWeights = m.listObjectsOfProperty(w,cex_weight)
    while (iterWeights.hasNext) {
@@ -256,7 +256,7 @@ object AddComputations extends App {
     weightsBuilder.result
  }
 
- def collectGroupings(m:Model, typeComponent: Resource) = {
+ private def collectGroupings(m:Model, typeComponent: Resource) = {
    val iterComponents = m.listSubjectsWithProperty(rdf_type,typeComponent)
    val groupingsBuilder = Map.newBuilder[Resource,Set[Resource]]
    while (iterComponents.hasNext) {
@@ -273,7 +273,7 @@ object AddComputations extends App {
  }
 
  
- def collectObservations(m: Model, dataset: Resource) : TableComputations = {
+ private def collectObservations(m: Model, dataset: Resource) : TableComputations = {
    val table = TableComputations.newTable
    val iterSlices = m.listObjectsOfProperty(dataset,qb_slice)
    while (iterSlices.hasNext) {
@@ -295,7 +295,7 @@ object AddComputations extends App {
  }
  
 
- def addValueComputed(m: Model, 
+ private def addValueComputed(m: Model, 
      obs: Resource, 
      indicator: Resource, 
      area: Resource, 
@@ -304,6 +304,7 @@ object AddComputations extends App {
    m.add(obs,cex_value,literalDouble(table.lookupValue(indicator,area)))
    val comp = newComp(m)
    m.add(obs,cex_computation,comp)
+   m.add(obs,cex_indicator,indicator)
    m.add(comp,rdf_type,cex_GroupMean)
    m.add(comp,cex_weightSchema,weights)
 
@@ -317,6 +318,54 @@ object AddComputations extends App {
            m.add(tuple,cex_weight,literalDouble(p._3))
     }
    }
+ }
+
+ def getCompScoreDataset(m:Model): Seq[Resource] = {
+   m.listSubjectsWithProperty(rdf_type,cex_ScoreDataset).toList
+ }
+ 
+ def getCompSlices(m:Model, comp: Resource): Seq[Resource] = {
+   m.listObjectsOfProperty(comp,cex_slice).map(_.asResource).toList
+ } 
+ 
+ def collectMinMax(m: Model, slice: Resource) : (Double,Double) = {
+   var min : Double = Double.MaxValue
+   var max : Double = Double.MinValue
+   for (obs <- getObservationsSlice(m, slice)) {
+     val value = getValue(m,obs)
+     if (value < min) min = value
+     if (value > max) max = value
+   }
+   (min,max)
+ }
+ 
+ def addScores(m:Model) : Model = {
+   val newModel = ModelFactory.createDefaultModel()
+   for (comp <- getCompScoreDataset(m)) {
+     val datasetToCopy = findSubject_asResource(m,comp,cex_computation)
+     for (sliceTo <- getDatasetSlices(m,datasetToCopy)) {
+       val year = getYear(m, sliceTo)
+       val indicatorTo = findProperty(m,sliceTo,cex_indicator)
+       for (sliceFrom <- getCompSlices(m,comp)) {
+         val indicatorFrom = findProperty(m,sliceFrom,cex_indicator)
+         if (indicatorTo == indicatorFrom) {
+           val (min,max) = collectMinMax(m,sliceFrom)
+           val range = max - min
+           for (obs <- getObservationsSlice(m, sliceFrom)) {
+             val obsTo = newObs(m,year)
+             val value = getValue(m,obs)
+             val newValue = 100 * (value - min) / range
+             newModel.add(sliceTo,qb_observation,obsTo)
+             newModel.add(obsTo,cex_value,literalDouble(newValue))
+             copyProperties(obsTo, newModel, Seq(wf_onto_ref_area,wf_onto_ref_year,cex_indicator), obs, m)
+           }
+         }
+       }
+     }
+   }
+        	 
+   newModel.setNsPrefixes(PREFIXES.cexMapping)
+   newModel
  }
  
  def addComputations(m: Model,primaryYear: Int) : Model = {
@@ -358,11 +407,24 @@ object AddComputations extends App {
      println("Index: " + index.size)
      m.add(index) 
 
+     println("Adding rankings datasets")
      m.add(AddDatasets.rankingsDataset(m,year))
+     m.add(AddDatasets.scoresDataset(m, year))
    }
-   AddRanking.addRankings(m) 
+
+   val scores = addScores(m)
+   println("Scores: " + scores.size)
+   m.add(scores)
+   println("Adding rankings")
+   AddRanking.addRankings(m)
    m
  } 
+ 
+ def addStep(step: Model => Model, m: Model,name: String): Unit = {
+   val newModel = step(m)
+   println(name + ": " + newModel.size)
+   m.add(newModel)
+ }
 
  override def main(args: Array[String]) {
 

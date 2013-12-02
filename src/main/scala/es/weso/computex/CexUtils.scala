@@ -145,7 +145,7 @@ object CexUtils {
  }
 
    
-   def getIndicators(m:Model): Seq[Resource] = 
+ def getIndicators(m:Model): Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,cex_Indicator).toList
  
  def getPrimaryIndicators(m:Model): Seq[Resource] = 
@@ -160,6 +160,8 @@ object CexUtils {
  def getSubindexes(m:Model): Seq[Resource] = 
    m.listSubjectsWithProperty(rdf_type,cex_SubIndex).toList
 
+ def getIndexes(m:Model): Seq[Resource] = 
+   m.listSubjectsWithProperty(rdf_type,cex_Index).toList
    
  def getYears(m:Model):SortedSet[Int] = {
    val slices : Seq[Resource] = m.listSubjectsWithProperty(rdf_type,qb_Slice).toList
@@ -405,6 +407,6 @@ object CexUtils {
    m.createResource(wi_score + s + "_" + year)
 
  def mkScore(m: Model, r: Resource, year:Int): Resource = 
-   mkRanking(m,r.getLocalName,year)
+   mkScore(m,r.getLocalName,year)
 
 }
