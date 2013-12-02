@@ -358,6 +358,16 @@ object AddComputations extends App {
              newModel.add(sliceTo,qb_observation,obsTo)
              newModel.add(obsTo,cex_value,literalDouble(newValue))
              copyProperties(obsTo, newModel, Seq(wf_onto_ref_area,wf_onto_ref_year,cex_indicator), obs, m)
+             
+             val comp = newComp(m)
+             m.add(obsTo,cex_computation,comp)
+             m.add(comp,rdf_type,cex_Score)
+             m.add(comp,cex_observation,obs)
+             m.add(comp,cex_slice,sliceFrom)
+             m.add(comp,cex_rangeMin,literalDouble(0))
+             m.add(comp,cex_rangeMax,literalDouble(100))
+             m.add(comp,cex_valueMin,literalDouble(min))
+             m.add(comp,cex_valueMax,literalDouble(max))
            }
          }
        }

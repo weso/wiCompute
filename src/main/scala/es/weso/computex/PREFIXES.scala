@@ -176,6 +176,7 @@ object PREFIXES {
  lazy val cex_Weight		    = resource("cex","Weight")
  lazy val cex_Normalized		= resource("cex","Normalized")
  lazy val cex_GroupMean			= resource("cex","GroupMean")
+ lazy val cex_Score				= resource("cex","Score")
 
  // Computations between Datasets
  lazy val cex_ImputeDataSet		= resource("cex","ImputeDataSet")
@@ -207,6 +208,10 @@ object PREFIXES {
  lazy val cex_method				= property("cex","method")
  lazy val cex_observation 			= property("cex","observation")
  lazy val cex_reason				= property("cex","reason")
+ lazy val cex_rangeMin				= property("cex","rangeMin")
+ lazy val cex_valueMin				= property("cex","valueMin")
+ lazy val cex_valueMax				= property("cex","valueMax")
+ lazy val cex_rangeMax				= property("cex","rangeMax")
  lazy val cex_slice					= property("cex","slice")
  lazy val cex_value					= property("cex","value")
  lazy val cex_weight				= property("cex","weight")
