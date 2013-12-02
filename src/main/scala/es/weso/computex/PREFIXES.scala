@@ -23,6 +23,7 @@ object PREFIXES {
   lazy val wi_country		= webindex + "country/"
   lazy val wi_obs			= webindex + "observation/"
   lazy val wi_ranking		= webindex + "ranking/"
+  lazy val wi_score		= webindex + "score/"
   lazy val wi_slice			= webindex + "slice/"
   lazy val wi_weightSchema	= webindex + "weightSchema/"
   lazy val wi_datasetComputed = wi_dataset + "computed"
@@ -183,6 +184,7 @@ object PREFIXES {
  lazy val cex_ClusterDataSets	= resource("cex","ClusterDataSets")
  lazy val cex_NormalizeDataSet	= resource("cex","NormalizeDataSet")
  lazy val cex_RankingDataset	= resource("cex","RankingDataset")
+ lazy val cex_ScoreDataset		= resource("cex","ScoreDataset")
  lazy val cex_GroupClusters		= resource("cex","GroupClusters")
  lazy val cex_GroupSubIndex		= resource("cex","GroupSubIndex")
  lazy val cex_GroupIndex		= resource("cex","GroupIndex")

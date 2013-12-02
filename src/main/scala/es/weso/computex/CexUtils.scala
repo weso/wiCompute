@@ -371,10 +371,40 @@ object CexUtils {
  def mkSlice(m:Model, r: Resource,year:Int) : Resource = 
    mkSlice(m,r.getLocalName,year)
   
+  def mkClusterIndicators(m: Model, year: Int): Resource = {
+   m.createResource(wi_dataset + "ClusterIndicators_" + year)
+ }
+ 
+ def mkClustersGrouped(m: Model, year: Int): Resource = {
+   m.createResource(wi_dataset + "ClustersGrouped_" + year)
+ }
+ 
+ def mkSubIndexGrouped(m: Model,year: Int): Resource = {
+   m.createResource(wi_dataset + "SubIndexGrouped_" + year)
+ }
+
+ def mkComposite(m: Model,year: Int): Resource = {
+   m.createResource(wi_dataset + "Composite_" + year)
+ }
+
+ def mkRankings(m: Model, year: Int): Resource = {
+   m.createResource(wi_dataset + "Rankings_" + year)
+ }
+
  def mkRanking(m: Model, s: String, year:Int) : Resource  = 
    m.createResource(wi_ranking + s + "_" + year)
 
  def mkRanking(m: Model, r: Resource, year:Int): Resource = 
+   mkRanking(m,r.getLocalName,year)
+
+ def mkScores(m: Model,year: Int): Resource = {
+   m.createResource(wi_dataset + "Scores_" + year)
+ }
+
+ def mkScore(m: Model, s: String, year:Int) : Resource  = 
+   m.createResource(wi_score + s + "_" + year)
+
+ def mkScore(m: Model, r: Resource, year:Int): Resource = 
    mkRanking(m,r.getLocalName,year)
 
 }

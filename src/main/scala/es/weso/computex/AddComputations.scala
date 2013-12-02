@@ -42,6 +42,7 @@ class AddComputationsOpts(arguments: Array[String],
     val output  = opt[String]("out",
     				descr = "Output file")
     val year  	= opt[Int]("year",
+                    required = true,
     				descr = "Year of current WebIndex")
     val version = opt[Boolean]("version", 
     				noshort = true, 
@@ -358,9 +359,8 @@ object AddComputations extends App {
      m.add(index) 
 
      m.add(AddDatasets.rankingsDataset(m,year))
-     AddRanking.addRankings(m,year) 
-
    }
+   AddRanking.addRankings(m) 
    m
  } 
 
