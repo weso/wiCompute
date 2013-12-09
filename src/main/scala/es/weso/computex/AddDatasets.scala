@@ -246,7 +246,7 @@ object AddDatasets extends App {
    newModel.add(newDataSet,cex_computation,computation)
    addCommonDataset(newModel,newDataSet)
 
-   val elements : Seq[Resource] = getIndexes(m) ++ getSubindexes(m)
+   val elements : Seq[Resource] = getIndexes(m) ++ getSubindexes(m) ++ getComponents(m)
    for (e <- elements) {
      newModel.add(computation,cex_slice,mkSlice(m,e,year))
      val sliceToRank = mkRanking(m,e,year)
