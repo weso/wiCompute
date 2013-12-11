@@ -36,20 +36,12 @@ class AddComputationsOpts(arguments: Array[String],
               |""".stripMargin)
     footer("Enjoy!")
     version("0.1")
-    val fileName = opt[String]("file",
-                    required=true,
-        			descr = "Turtle file")
-    val output  = opt[String]("out",
-    				descr = "Output file")
-    val year  	= opt[Int]("year",
-                    required = true,
-    				descr = "Year of current WebIndex")
-    val version = opt[Boolean]("version", 
-    				noshort = true, 
-    				descr = "Print version")
-    val help 	= opt[Boolean]("help", 
-    				noshort = true, 
-    				descr = "Show this message")
+    val fileName 	= opt[String]("file", required=true, descr = "Turtle file")
+    val output  	= opt[String]("out", descr = "Output file")
+    val namespace   = opt[String]("namespace", descr = "Namespace")
+    val year  		= opt[Int]("year", required = true, descr = "Year of current WebIndex")
+    val version 	= opt[Boolean]("version",  noshort = true, descr = "Print version")
+    val help 		= opt[Boolean]("help", noshort = true, descr = "Show this message")
   
   override protected def onError(e: Throwable) = onError(e, builder)
 }
@@ -378,7 +370,7 @@ object AddComputations extends App {
    newModel
  }
  
- def addComputations(m: Model,primaryYear: Int) : Model = {
+ def addComputations(m: Model, primaryYear: Int, namespace: String) : Model = {
 
    // Removes the first year because we secondary indicators of one year are based
    // on year before
@@ -447,7 +439,7 @@ object AddComputations extends App {
    val model = ModelFactory.createDefaultModel
    val inputStream = FileManager.get.open(opts.fileName())
    model.read(inputStream,"","TURTLE")
-   val newModel = addComputations(model,opts.year())
+   val newModel = addComputations(model,opts.year(),opts.namespace())
    if (opts.output.get == None) newModel.write(System.out,"TURTLE")
    else {
      val fileOutput = opts.output()
