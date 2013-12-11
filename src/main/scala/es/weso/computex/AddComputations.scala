@@ -38,7 +38,7 @@ class AddComputationsOpts(arguments: Array[String],
     version("0.1")
     val fileName 	= opt[String]("file", required=true, descr = "Turtle file")
     val output  	= opt[String]("out", descr = "Output file")
-    val namespace   = opt[String]("namespace", descr = "Namespace")
+    val namespace   = opt[String]("namespace", default=Some("webindex"), descr = "Namespace")
     val year  		= opt[Int]("year", required = true, descr = "Year of current WebIndex")
     val version 	= opt[Boolean]("version",  noshort = true, descr = "Print version")
     val help 		= opt[Boolean]("help", noshort = true, descr = "Show this message")
